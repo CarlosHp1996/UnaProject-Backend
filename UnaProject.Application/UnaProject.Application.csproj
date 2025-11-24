@@ -13,7 +13,6 @@
     <Folder Include="Commands\Products\Handlers\" />
     <Folder Include="Commands\Security\Handlers\" />
     <Folder Include="Commands\Trackings\Handlers\" />
-    <Folder Include="Interfaces\" />
     <Folder Include="Models\Dtos\" />
     <Folder Include="Models\Filters\" />
     <Folder Include="Models\Responses\" />
@@ -37,6 +36,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.5" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.5.0" />
     <PackageReference Include="Resend" Version="0.2.1" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.5.0" />
   </ItemGroup>
 
   <ItemGroup>
