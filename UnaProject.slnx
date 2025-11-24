@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="UnaProject.Application/UnaProject.Application.csproj" />
+  <Project Path="UnaProject.Domain/UnaProject.Domain.csproj" />
+  <Project Path="UnaProject.Infra/UnaProject.Infra.csproj" />
+  <Project Path="UnaProject/UnaProject.Web.csproj" />
+</Solution>

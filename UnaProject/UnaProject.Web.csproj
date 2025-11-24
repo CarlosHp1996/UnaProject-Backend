@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Configuration\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UnaProject.Application\UnaProject.Application.csproj" />
+    <ProjectReference Include="..\UnaProject.Domain\UnaProject.Domain.csproj" />
+    <ProjectReference Include="..\UnaProject.Infra\UnaProject.Infra.csproj" />
+  </ItemGroup>
+
+</Project>
