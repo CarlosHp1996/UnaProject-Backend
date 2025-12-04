@@ -63,7 +63,7 @@ namespace UnaProject.Domain.Security
             var tokenHandler = new JwtSecurityTokenHandler();
             if (!tokenHandler.CanReadToken(token))
             {
-                return; // Token inválido, nada a fazer
+                return; // Invalid Token
             }
 
             var jwtToken = tokenHandler.ReadJwtToken(token);

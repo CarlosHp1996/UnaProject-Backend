@@ -121,24 +121,24 @@ builder.Services.AddDbContext<AppDbContext>(options =>
             errorCodesToAdd: null);
         npgsqlOptions.CommandTimeout(30);
     }));
-// ===== FIM CONFIGURAÇÃO DBCONTEXT =====
+// ===== END DBCONTEXT CONFIGURATION =====
 
-// ===== CONFIGURAÇÃO REDIS =====
+// ===== REDIS CONFIGURATION =====
 //var redisUrl = Environment.GetEnvironmentVariable("REDIS_URL");
 //string redisConnectionString;
 
 //if (!string.IsNullOrEmpty(redisUrl))
 //{
 //    redisConnectionString = ConvertRedisUrl(redisUrl);
-//    Console.WriteLine("🔗 Usando REDIS_URL do Railway");
+//    Console.WriteLine("Using Railway's REDIS_URL");
 //}
 //else
 //{
 //    redisConnectionString = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
-//    Console.WriteLine("🔗 Usando Redis connection string local");
+//    Console.WriteLine("Using Redis local connection string");
 //}
 
-//Console.WriteLine($"🔗 Redis Connection: {redisConnectionString}");
+//Console.WriteLine($"Redis Connection: {redisConnectionString}");
 
 //try
 //{
@@ -148,34 +148,31 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 //        options.InstanceName = "Una";
 //    });
 //    builder.Services.AddScoped<ICartService, CartService>();
-//    Console.WriteLine("✅ Redis configurado com sucesso!");
+//    Console.WriteLine("Redis configured successfully!");
 //}
 //catch (Exception ex)
 //{
-//    Console.WriteLine($"❌ Erro ao configurar Redis: {ex.Message}");
-//    Console.WriteLine("⚠️ Usando cache em memória como fallback...");
+//    Console.WriteLine($"Error configuring Redis: {ex.Message}");
+//    Console.WriteLine("Using in-memory cache as fallback...");
 //    builder.Services.AddMemoryCache();
 //    builder.Services.AddScoped<ICartService, CartService>();
 //}
-// ===== FIM CONFIGURAÇÃO REDIS =====
+// ===== END REDIS CONFIGURATION =====
 
-// Registrar outros serviços
+// Register other services
 builder.Services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
-builder.Services.AddScoped<ICodeGeneratorService, CodeGeneratorService>();
-builder.Services.AddScoped<ITemplateService, TemplateService>();
-builder.Services.AddSingleton<IFileSystemService, FileSystemService>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<ITrackingRepository, TrackingRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddHttpClient();
 
-//PRODUÇÃO
+//PRODUCTION
 // File Storage Service
 builder.Services.AddScoped<IFileStorageService>(provider =>
     new FileStorageService("/app/ImagensBackend"));
-//DESENVOLVIMENTO
+//DEVELOPMENT
 //builder.Services.AddScoped<IFileStorageService>(provider =>
 //    new FileStorageService(
 //        @"C:\Users\Carlos Henrique\Desktop\PROJETOS\una-estudio-criativo\ImagensBackend"
@@ -194,7 +191,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
             "https://unaestudiocriativo.com.br",
             "https://www.unaestudiocriativo.com.br",
-            //URLS PARA TESTAR FRONTEND EM AMBIENTE DEV
+            //URLs for testing frontends in a development environment.
             "http://127.0.0.1:5502",
             "http://localhost:5502"
         )
@@ -269,12 +266,12 @@ builder.Services.AddAuthentication(options =>
                 var token = context.SecurityToken as JwtSecurityToken;
                 if (token != null && AccessManager.IsTokenBlacklisted(token.RawData))
                 {
-                    context.Fail("Este token foi invalidado.");
+                    context.Fail("This token has been invalidated..");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"⚠️ Erro na validação do token: {ex.Message}");
+                Console.WriteLine($"Token validation error: {ex.Message}");
             }
             return Task.CompletedTask;
         }
@@ -316,11 +313,11 @@ builder.Services.AddSwaggerGen(c =>
 
     c.EnableAnnotations();
 });
-// ===== FIM SWAGGER =====
+// ===== END SWAGGER =====
 
 var app = builder.Build();
 
-// ===== TESTE DE CONEXÃO REDIS =====
+// ===== REDIS CONNECTION TEST =====
 using (var scope = app.Services.CreateScope())
 {
     try
@@ -328,7 +325,7 @@ using (var scope = app.Services.CreateScope())
         var cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-        await cache.SetStringAsync("test-connection", "Redis conectado!", new DistributedCacheEntryOptions
+        await cache.SetStringAsync("test-connection", "Redis connected!", new DistributedCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1)
         }, cts.Token);
@@ -337,22 +334,22 @@ using (var scope = app.Services.CreateScope())
 
         if (testValue != null)
         {
-            Console.WriteLine("✅ Redis conectado com sucesso!");
+            Console.WriteLine("Redis connected successfully!");
         }
         else
         {
-            Console.WriteLine("❌ Redis teste falhou");
+            Console.WriteLine("❌ Redis connection test failed");
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Erro ao testar Redis: {ex.Message}");
-        Console.WriteLine("⚠️ Aplicação continuará sem Redis Cache...");
+        Console.WriteLine($"❌ Error testing Redis: {ex.Message}");
+        Console.WriteLine("Application will continue without Redis Cache...");
     }
 }
-// ===== FIM TESTE REDIS =====
+// ===== END REDIS CONNECTION TEST =====
 
-// ===== APLICAR MIGRATIONS E INICIALIZAR BANCO =====
+// ===== APPLY MIGRATIONS AND INITIALIZE DATABASE =====
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -360,72 +357,72 @@ using (var scope = app.Services.CreateScope())
 
     try
     {
-        Console.WriteLine("🔄 Verificando conexão com o banco de dados...");
+        Console.WriteLine("Checking connection to the database...");
         var context = services.GetRequiredService<AppDbContext>();
 
-        // Testar conexão com timeout maior
+        // Test connection with a longer timeout
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
-        // Tentar conectar várias vezes
+        // Try connecting multiple times
         bool connected = false;
         for (int attempt = 1; attempt <= 5; attempt++)
         {
             try
             {
-                Console.WriteLine($"🔄 Tentativa {attempt} de conexão...");
+                Console.WriteLine($"Attempt {attempt} to connect...");
                 connected = await context.Database.CanConnectAsync(cts.Token);
                 if (connected) break;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Tentativa {attempt} falhou: {ex.Message}");
+                Console.WriteLine($"Attempt {attempt} failed: {ex.Message}");
                 if (attempt < 5)
                 {
-                    await Task.Delay(5000, cts.Token); // Aguarda 5 segundos antes da próxima tentativa
+                    await Task.Delay(5000, cts.Token); // Wait 5 seconds before the next attempt
                 }
             }
         }
 
         if (!connected)
         {
-            throw new InvalidOperationException("Não foi possível conectar ao banco de dados após 5 tentativas");
+            throw new InvalidOperationException("We were unable to connect to the database after 5 attempts.");
         }
 
-        Console.WriteLine("✅ Conexão com banco de dados estabelecida!");
+        Console.WriteLine("Database connection established!");
 
-        // Aplicar migrations
-        Console.WriteLine("🔄 Aplicando migrations...");
+        // Apply migrations
+        Console.WriteLine("Applying migrations...");
         await context.Database.MigrateAsync(cts.Token);
-        Console.WriteLine("✅ Migrations aplicadas com sucesso!");
+        Console.WriteLine("Migrations applied successfully!");
 
-        // Seed de dados
+        // Seed data
         // await SeedData.Initialize(context);
-        // Console.WriteLine("✅ Dados iniciais configurados!");
+        // Console.WriteLine("Initial data seeded!");
 
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "❌ Erro crítico ao inicializar o banco de dados");
-        Console.WriteLine($"❌ ERRO CRÍTICO: {ex.Message}");
+        logger.LogError(ex, "Critical error initializing the database");
+        Console.WriteLine($"CRITICAL ERROR: {ex.Message}");
 
         if (ex.InnerException != null)
         {
-            Console.WriteLine($"❌ ERRO INTERNO: {ex.InnerException.Message}");
+            Console.WriteLine($"INTERNAL ERROR: {ex.InnerException.Message}");
         }
 
         // Em produção, vamos tentar continuar sem o banco para debug
-        Console.WriteLine("⚠️ Continuando sem banco de dados inicializado...");
+        Console.WriteLine("Continuando sem banco de dados inicializado...");
         // throw; // Descomente em produção se quiser parar aqui
     }
 }
-// ===== FIM MIGRATIONS =====
+// ===== END MIGRATIONS =====
 
-// ===== SEED DE USUÁRIOS =====
+// ===== USER SEED =====
 using (var scope = app.Services.CreateScope())
 {
     try
     {
-        Console.WriteLine("🔄 Inicializando usuários do sistema...");
+        Console.WriteLine("Inicializando usuários do sistema...");
 
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
@@ -441,7 +438,7 @@ using (var scope = app.Services.CreateScope())
             }
         }
 
-        // Criar usuário Admin Carlos
+        // Create user Admin Carlos
         var adminUser = await userManager.FindByEmailAsync("carloshpsantos1996@gmail.com");
         if (adminUser == null)
         {
@@ -456,38 +453,38 @@ using (var scope = app.Services.CreateScope())
             if (result.Succeeded)
             {
                 await userManager.AddToRoleAsync(adminUser, "Admin");
-                Console.WriteLine("✅ Admin Carlos criado!");
+                Console.WriteLine("✅ Admin Carlos created!");
             }
         }
 
-        // Criar usuário Admin Rivael
-        var adminUserRivael = await userManager.FindByEmailAsync("rivaelrocha@icloud.com");
-        if (adminUserRivael == null)
+        // Create user Admin Geisa
+        var adminUserGeisa = await userManager.FindByEmailAsync("geisaferoli@gmail.com");
+        if (adminUserGeisa == null)
         {
-            adminUserRivael = new ApplicationUser
+            adminUserGeisa = new ApplicationUser
             {
-                UserName = "RivaelAdmin",
-                Email = "rivaelrocha@icloud.com",
+                UserName = "GeisaAdmin",
+                Email = "geisaferoli@gmail.com",
                 EmailConfirmed = true
             };
 
-            var resultRivael = await userManager.CreateAsync(adminUserRivael, "@Rivael123");
-            if (resultRivael.Succeeded)
+            var resultGeisa = await userManager.CreateAsync(adminUserGeisa, "@Geisa123");
+            if (resultGeisa.Succeeded)
             {
-                await userManager.AddToRoleAsync(adminUserRivael, "Admin");
-                Console.WriteLine("✅ Usuário Admin Rivael criado com sucesso!");
+                await userManager.AddToRoleAsync(adminUserGeisa, "Admin");
+                Console.WriteLine("✅ User Admin Geisa created successfully!");
             }
             else
             {
-                Console.WriteLine($"❌ Erro ao criar usuário Admin Rivael: {string.Join(", ", resultRivael.Errors.Select(e => e.Description))}");
+                Console.WriteLine($"❌ Error creating user Admin Geisa: {string.Join(", ", resultGeisa.Errors.Select(e => e.Description))}");
             }
         }
         else
         {
-            Console.WriteLine("ℹ️  Usuário Admin Rivael já existe.");
+            Console.WriteLine("ℹ️  User Admin Geisa already exists.");
         }
 
-        // Criar usuários Admin adicionais para teste
+        // Create additional Admin users for testing
         for (int i = 1; i <= 5; i++)
         {
             string userName = $"admin{i}";
@@ -508,38 +505,38 @@ using (var scope = app.Services.CreateScope())
                 if (createResult.Succeeded)
                 {
                     await userManager.AddToRoleAsync(newAdmin, "Admin");
-                    Console.WriteLine($"✅ Usuário {userName} criado com sucesso!");
+                    Console.WriteLine($"User {userName} created successfully!");
                 }
                 else
                 {
-                    Console.WriteLine($"❌ Erro ao criar {userName}: {string.Join(", ", createResult.Errors.Select(e => e.Description))}");
+                    Console.WriteLine($"Error creating {userName}: {string.Join(", ", createResult.Errors.Select(e => e.Description))}");
                 }
             }
             else
             {
-                Console.WriteLine($"ℹ️ Usuário {userName} já existe.");
+                Console.WriteLine($"ℹUser {userName} already exists.");
             }
         }
 
-        Console.WriteLine("✅ Usuários inicializados!");
+        Console.WriteLine("Users initialized!");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Erro ao criar usuários: {ex.Message}");
+        Console.WriteLine($"Error creating users: {ex.Message}");
     }
 }
-// ===== FIM SEED =====
+// ===== END SEED =====
 
-// ===== CONFIGURAÇÃO DE ARQUIVOS ESTÁTICOS =====
+// ===== STATIC FILE CONFIGURATION =====
 
-//PRODUÇÃO
+//PRODUCTION
 // app.UseStaticFiles(new StaticFileOptions
 // {
 //     FileProvider = new PhysicalFileProvider("/app/ImagensBackend"),
 //     RequestPath = "/imagens"
 // });
 
-//DESENVOLVIMENTO
+//DEVELOPMENT
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(
@@ -547,9 +544,9 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = ""
 });
 
-// ===== FIM ARQUIVOS ESTÁTICOS =====
+// ===== END STATIC FILES =====
 
-// ===== PIPELINE DE MIDDLEWARE =====
+// ===== MIDDLEWARE PIPELINE =====
 if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 
@@ -569,10 +566,10 @@ app.UseAuthentication();
 app.UseSession();
 app.UseAuthorization();
 app.MapControllers();
-// ===== FIM PIPELINE =====
+// ===== END PIPELINE =====
 
-Console.WriteLine("Aplicação iniciada com sucesso!");
-Console.WriteLine($"Swagger disponível em: /swagger");
+Console.WriteLine("Application started successfully!");
+Console.WriteLine($"Swagger available at: /swagger");
 
 app.Run();
 
