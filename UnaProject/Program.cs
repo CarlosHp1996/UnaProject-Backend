@@ -8,6 +8,8 @@ using Microsoft.OpenApi.Models;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using UnaProject.Application.Interfaces;
+using UnaProject.Application.Services;
+using UnaProject.Application.Services.Interfaces;
 using UnaProject.Domain.Entities.Security;
 using UnaProject.Domain.Security;
 using UnaProject.Infra.Data;
@@ -15,7 +17,7 @@ using UnaProject.Infra.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ===== FUNÇÃO PARA CONVERTER DATABASE_URL =====
+// ===== FUNCTION TO CONVERT DATABASE_URL =====
 string ConvertDatabaseUrl(string databaseUrl)
 {
     if (string.IsNullOrEmpty(databaseUrl))
@@ -34,12 +36,12 @@ string ConvertDatabaseUrl(string databaseUrl)
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Erro ao converter DATABASE_URL: {ex.Message}");
-        return databaseUrl; // Retorna original se falhar
+        Console.WriteLine($"Error converting DATABASE_URL: {ex.Message}");
+        return databaseUrl; // Returns original if failed
     }
 }
 
-// ===== FUNÇÃO PARA CONVERTER REDIS_URL =====
+// ===== FUNCTION TO CONVERT REDIS_URL =====
 string ConvertRedisUrl(string redisUrl)
 {
     if (string.IsNullOrEmpty(redisUrl))
@@ -67,29 +69,29 @@ string ConvertRedisUrl(string redisUrl)
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Erro ao converter REDIS_URL: {ex.Message}");
+        Console.WriteLine($"Error converting REDIS_URL: {ex.Message}");
         return "localhost:6379";
     }
 }
 
-// ===== CONFIGURAÇÃO DE CONNECTION STRING =====
+// ===== CONNECTION STRING CONFIGURATION =====
 var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
 string connectionString;
 
 if (!string.IsNullOrEmpty(databaseUrl))
 {
     connectionString = ConvertDatabaseUrl(databaseUrl);
-    Console.WriteLine("🔗 Usando DATABASE_URL do Railway");
+    Console.WriteLine("Using DATABASE_URL from Railway");
 }
 else
 {
     connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
                       throw new InvalidOperationException("Connection string not found!");
-    Console.WriteLine("🔗 Usando connection string local");
+    Console.WriteLine("Using local connection string");
 }
 
-Console.WriteLine($"🔗 Connection String: {connectionString.Substring(0, Math.Min(50, connectionString.Length))}...");
-// ===== FIM CONFIGURAÇÃO CONNECTION STRING =====
+Console.WriteLine($"Connection String: {connectionString.Substring(0, Math.Min(50, connectionString.Length))}...");
+// ===== END CONNECTION STRING CONFIGURATION =====
 
 // Add services to the container.
 builder.Services.AddControllers()
@@ -111,7 +113,7 @@ builder.Services.AddSession(options =>
 builder.Services.AddScoped<AccessManager>();
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
-// ===== CONFIGURAÇÃO DO DBCONTEXT =====
+// ===== DBCONTEXT CONFIGURATION =====
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString, npgsqlOptions =>
     {
@@ -161,17 +163,17 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Register other services
 builder.Services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
-builder.Services.AddScoped<IProductRepository, ProductRepository>();
-builder.Services.AddScoped<IOrderRepository, OrderRepository>();
-builder.Services.AddScoped<ITrackingRepository, TrackingRepository>();
+//builder.Services.AddScoped<IProductRepository, ProductRepository>();
+//builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+//builder.Services.AddScoped<ITrackingRepository, TrackingRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddHttpClient();
 
 //PRODUCTION
 // File Storage Service
-builder.Services.AddScoped<IFileStorageService>(provider =>
-    new FileStorageService("/app/ImagensBackend"));
+//builder.Services.AddScoped<IFileStorageService>(provider =>
+//    new FileStorageService("/app/ImagensBackend"));
 //DEVELOPMENT
 //builder.Services.AddScoped<IFileStorageService>(provider =>
 //    new FileStorageService(
@@ -179,8 +181,8 @@ builder.Services.AddScoped<IFileStorageService>(provider =>
 //    ));
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<IUrlHelperService, UrlHelperService>();
-builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+//builder.Services.AddScoped<IUrlHelperService, UrlHelperService>();
+//builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 //builder.Services.AddStripeServices(builder.Configuration);
 
 // CORS Configuration
@@ -540,7 +542,7 @@ using (var scope = app.Services.CreateScope())
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(
-       @"C:\Users\Carlos Henrique\Desktop\PROJETOS\una-estudio-criativo\ImagensBackend"),
+       @"C:\Users\Carlos Henrique\Desktop\DESKTOP\PROJETOS\una-estudio-criativo\ImagensBackend"),
     RequestPath = ""
 });
 

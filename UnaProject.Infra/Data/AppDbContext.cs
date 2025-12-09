@@ -1,9 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using UnaProject.Domain.Entities;
 using UnaProject.Domain.Entities.Security;
 
@@ -27,7 +24,7 @@ namespace UnaProject.Infra.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Configuração de Product
+            // Product configuration
             modelBuilder.Entity<Product>(entity =>
             {
                 entity.ToTable("Products");
@@ -59,7 +56,7 @@ namespace UnaProject.Infra.Data
                 entity.Property(p => p.UpdatedAt)
                     .IsRequired();
 
-                // Relacionamentos               
+                // Relationships               
                 entity.HasMany(p => p.OrderItems)
                     .WithOne(oi => oi.Product)
                     .HasForeignKey(oi => oi.ProductId)
@@ -74,7 +71,7 @@ namespace UnaProject.Infra.Data
                     .HasForeignKey<Inventory>(i => i.ProductId);
             });
 
-            // Configuração de Order
+            // Order Configuration
             modelBuilder.Entity<Order>(entity =>
             {
                 entity.ToTable("Orders");
@@ -98,7 +95,7 @@ namespace UnaProject.Infra.Data
                 entity.Property(o => o.UpdatedAt)
                     .IsRequired();
 
-                // Relacionamentos
+                // Relationships
                 entity.HasOne(o => o.User)
                     .WithMany()
                     .HasForeignKey(o => o.UserId)
@@ -117,10 +114,10 @@ namespace UnaProject.Infra.Data
                 entity.HasOne(o => o.Address)
                     .WithMany()
                     .HasForeignKey(o => o.AddressId)
-                    .OnDelete(DeleteBehavior.Restrict); // Impede a exclusão de um endereço se houver pedidos associados
+                    .OnDelete(DeleteBehavior.Restrict); // Prevents the deletion of an address if there are associated requests.
             });
 
-            // Configuração de OrderItem
+            // OrderItem Configuration
             modelBuilder.Entity<OrderItem>(entity =>
             {
                 entity.ToTable("OrderItems");
@@ -134,14 +131,14 @@ namespace UnaProject.Infra.Data
                     .HasColumnType("decimal(18,2)");
             });
 
-            // Configuração de ProductAttribute
+            // ProductAttribute configuration
             modelBuilder.Entity<ProductAttribute>(entity =>
             {
                 entity.ToTable("ProductAttributes");
                 entity.HasKey(pa => pa.Id);
             });
 
-            // Configuração de Inventory
+            // Inventory Configuration
             modelBuilder.Entity<Inventory>(entity =>
             {
                 entity.ToTable("Inventory");
@@ -154,7 +151,7 @@ namespace UnaProject.Infra.Data
                     .IsRequired();
             });
 
-            // Configuração de Payment
+            // Payment Configuration
             modelBuilder.Entity<Payment>(entity =>
             {
                 entity.ToTable("Payments");
@@ -179,7 +176,7 @@ namespace UnaProject.Infra.Data
                     .IsRequired();
             });
 
-            // Configuração de Tracking
+            // Tracking Configuration
             modelBuilder.Entity<Tracking>(entity =>
             {
                 entity.ToTable("Trackings");
@@ -198,7 +195,7 @@ namespace UnaProject.Infra.Data
                 entity.Property(t => t.CreatedAt)
                     .IsRequired();
 
-                // Relacionamento
+                // Relationship
                 entity.HasOne(th => th.Order)
                     .WithMany()
                     .HasForeignKey(th => th.OrderId)
@@ -220,7 +217,7 @@ namespace UnaProject.Infra.Data
                 entity.Property(a => a.Complement).HasMaxLength(100);
                 entity.Property(a => a.MainAddress).IsRequired();
 
-                // Relacionamento com ApplicationUser
+                // Relationship with ApplicationUser
                 entity.HasOne(a => a.User)
                     .WithMany(u => u.Addresses)
                     .HasForeignKey(a => a.UserId)
