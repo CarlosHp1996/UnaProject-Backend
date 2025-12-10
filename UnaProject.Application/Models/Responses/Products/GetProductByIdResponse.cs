@@ -1,6 +1,8 @@
-﻿namespace UnaProject.Domain.Entities
+﻿using UnaProject.Application.Models.Dtos;
+
+namespace UnaProject.Application.Models.Responses.Products
 {
-    public class Product
+    public class GetProductByIdResponse
     {
         public Guid Id { get; set; }
         public string Name { get; set; }
@@ -11,9 +13,6 @@
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
-
-        public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
-        public virtual ICollection<ProductAttribute> Attributes { get; set; } = new List<ProductAttribute>();
-        public virtual Inventory Inventory { get; set; }
+        public List<ProductAttributeDto> Attributes { get; set; } = new List<ProductAttributeDto>();
     }
 }

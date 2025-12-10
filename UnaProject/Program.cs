@@ -163,7 +163,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Register other services
 builder.Services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
-//builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
 //builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 //builder.Services.AddScoped<ITrackingRepository, TrackingRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -175,13 +175,13 @@ builder.Services.AddHttpClient();
 //builder.Services.AddScoped<IFileStorageService>(provider =>
 //    new FileStorageService("/app/ImagensBackend"));
 //DEVELOPMENT
-//builder.Services.AddScoped<IFileStorageService>(provider =>
-//    new FileStorageService(
-//        @"C:\Users\Carlos Henrique\Desktop\PROJETOS\una-estudio-criativo\ImagensBackend"
-//    ));
+builder.Services.AddScoped<IFileStorageService>(provider =>
+    new FileStorageService(
+        @"C:\Users\Carlos Henrique\Desktop\PROJETOS\una-estudio-criativo\ImagensBackend"
+    ));
 
 builder.Services.AddHttpContextAccessor();
-//builder.Services.AddScoped<IUrlHelperService, UrlHelperService>();
+builder.Services.AddScoped<IUrlHelperService, UrlHelperService>();
 //builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 //builder.Services.AddStripeServices(builder.Configuration);
 
