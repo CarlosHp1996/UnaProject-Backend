@@ -164,7 +164,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Register other services
 builder.Services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
-//builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 //builder.Services.AddScoped<ITrackingRepository, TrackingRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
@@ -177,7 +177,7 @@ builder.Services.AddHttpClient();
 //DEVELOPMENT
 builder.Services.AddScoped<IFileStorageService>(provider =>
     new FileStorageService(
-        @"C:\Users\Carlos Henrique\Desktop\PROJETOS\una-estudio-criativo\ImagensBackend"
+        @"C:\Users\Carlos Henrique\Desktop\DESKTOP\PROJETOS\una-estudio-criativo\ImagensBackend"
     ));
 
 builder.Services.AddHttpContextAccessor();
@@ -345,7 +345,7 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Error testing Redis: {ex.Message}");
+        Console.WriteLine($"Error testing Redis: {ex.Message}");
         Console.WriteLine("Application will continue without Redis Cache...");
     }
 }
@@ -408,13 +408,7 @@ using (var scope = app.Services.CreateScope())
         Console.WriteLine($"CRITICAL ERROR: {ex.Message}");
 
         if (ex.InnerException != null)
-        {
-            Console.WriteLine($"INTERNAL ERROR: {ex.InnerException.Message}");
-        }
-
-        // Em produção, vamos tentar continuar sem o banco para debug
-        Console.WriteLine("Continuando sem banco de dados inicializado...");
-        // throw; // Descomente em produção se quiser parar aqui
+            Console.WriteLine($"INTERNAL ERROR: {ex.InnerException.Message}");        
     }
 }
 // ===== END MIGRATIONS =====
@@ -436,7 +430,7 @@ using (var scope = app.Services.CreateScope())
             if (!await roleManager.RoleExistsAsync(roleName))
             {
                 await roleManager.CreateAsync(new IdentityRole<Guid> { Name = roleName });
-                Console.WriteLine($"✅ Role '{roleName}' criada!");
+                Console.WriteLine($"Role '{roleName}' criada!");
             }
         }
 
@@ -455,7 +449,7 @@ using (var scope = app.Services.CreateScope())
             if (result.Succeeded)
             {
                 await userManager.AddToRoleAsync(adminUser, "Admin");
-                Console.WriteLine("✅ Admin Carlos created!");
+                Console.WriteLine("Admin Carlos created!");
             }
         }
 
@@ -474,16 +468,16 @@ using (var scope = app.Services.CreateScope())
             if (resultGeisa.Succeeded)
             {
                 await userManager.AddToRoleAsync(adminUserGeisa, "Admin");
-                Console.WriteLine("✅ User Admin Geisa created successfully!");
+                Console.WriteLine("User Admin Geisa created successfully!");
             }
             else
             {
-                Console.WriteLine($"❌ Error creating user Admin Geisa: {string.Join(", ", resultGeisa.Errors.Select(e => e.Description))}");
+                Console.WriteLine($"Error creating user Admin Geisa: {string.Join(", ", resultGeisa.Errors.Select(e => e.Description))}");
             }
         }
         else
         {
-            Console.WriteLine("ℹ️  User Admin Geisa already exists.");
+            Console.WriteLine("User Admin Geisa already exists.");
         }
 
         // Create additional Admin users for testing

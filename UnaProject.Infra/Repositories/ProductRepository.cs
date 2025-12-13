@@ -119,7 +119,7 @@ namespace UnaProject.Infra.Repositories
                 {
                     imageUrl = await _fileStorage.UploadFileAsync(
                         request.ImageUrl,
-                        "videos/images",
+                        "images",
                         $"{Guid.NewGuid()}_{request.ImageUrl.FileName}");
                 }                
 
@@ -222,7 +222,7 @@ namespace UnaProject.Infra.Repositories
                 {
                     imageUrl = await _fileStorage.UploadFileAsync(
                         request.ImageUrl,
-                        "videos/images",
+                        "images",
                         $"{Guid.NewGuid()}_{request.ImageUrl.FileName}");
                 }
 
