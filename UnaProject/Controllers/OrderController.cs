@@ -4,8 +4,11 @@ using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Security.Claims;
 using UnaProject.Application.Commands.Orders;
+using UnaProject.Application.Commands.Payments;
 using UnaProject.Application.Models.Filters;
+using UnaProject.Application.Models.Dtos;
 using UnaProject.Application.Models.Requests.Orders;
+using UnaProject.Application.Models.Requests.Payments;
 using UnaProject.Application.Models.Responses.Orders;
 using UnaProject.Application.Queries.Orders;
 using UnaProject.Domain.Helpers;
@@ -69,10 +72,10 @@ namespace UnaProject.Web.Controllers
                 {
                     var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
                     if (userId != null && orderResult.Value.Order.UserId != Guid.Parse(userId))
-                        return Forbid();                    
+                        return Forbid();
                 }
                 else
-                    return NotFound();                
+                    return NotFound();
             }
 
             var command = new UpdateOrderItemCommand(orderId, itemId, request);
@@ -140,6 +143,44 @@ namespace UnaProject.Web.Controllers
                 return Ok(result);
 
             return BadRequest(result.Errors);
+        }
+
+        [SwaggerOperation(
+            Summary = "Complete order with payment.",
+            Description = "Complete an order by creating an associated AbacatePay payment.")]
+        [SwaggerResponse(200, "Order completed successfully", typeof(Result<PaymentDto>))]
+        [SwaggerResponse(400, "Validation error or order already completed")]
+        [SwaggerResponse(404, "Order not found")]
+        [SwaggerResponse(500, "Internal server error")]
+        [HttpPost("{orderId}/checkout")]
+        public async Task<IActionResult> CheckoutOrder(Guid orderId, [FromBody] CheckoutOrderRequest request)
+        {
+            try
+            {
+                // Create payment command
+                var paymentCommand = new CreateAbacatePaymentCommand(
+                    orderId,
+                    request.Amount,
+                    request.PaymentMethod,
+                    request.CustomerName,
+                    null, // CustomerDocument
+                    request.CustomerEmail,
+                    null, // CustomerPhone
+                    request.ReturnUrl,
+                    $"Order:{orderId}" // Metadata
+                );
+
+                var paymentResponse = await _mediator.Send(paymentCommand);
+
+                if (paymentResponse.HasSuccess)
+                    return Ok(paymentResponse);
+
+                return BadRequest(paymentResponse);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Internal server error while processing checkout" });
+            }
         }
     }
 }

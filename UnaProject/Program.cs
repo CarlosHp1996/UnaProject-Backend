@@ -10,6 +10,8 @@ using System.Text;
 using UnaProject.Application.Interfaces;
 using UnaProject.Application.Services;
 using UnaProject.Application.Services.Interfaces;
+using UnaProject.Application.Extensions;
+using UnaProject.Application.Services.Background;
 using UnaProject.Domain.Entities.Security;
 using UnaProject.Domain.Security;
 using UnaProject.Infra.Data;
@@ -167,8 +169,35 @@ builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<ITrackingRepository, TrackingRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddHttpClient();
+
+// AbacatePay Configuration
+builder.Services.AddAbacatePay(builder.Configuration);
+builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IWebhookRetryService, WebhookRetryService>();
+builder.Services.AddScoped<IPaymentNotificationService, PaymentNotificationService>();
+
+// Notification Options Configuration
+builder.Services.Configure<NotificationOptions>(options =>
+{
+    options.AdminEmail = builder.Configuration["Notifications:AdminEmail"] ?? "admin@unaestudiocriativo.com.br";
+    options.EnableCustomerNotifications = builder.Configuration.GetValue<bool>("Notifications:EnableCustomerNotifications", true);
+    options.EnableAdminNotifications = builder.Configuration.GetValue<bool>("Notifications:EnableAdminNotifications", true);
+    options.CompanyName = builder.Configuration["Notifications:CompanyName"] ?? "Una Estúdio Criativo";
+    options.SupportEmail = builder.Configuration["Notifications:SupportEmail"] ?? "suporte@unaestudiocriativo.com.br";
+});
+
+// Webhook Retry Background Service Configuration
+builder.Services.Configure<WebhookRetryBackgroundOptions>(
+    builder.Configuration.GetSection(WebhookRetryBackgroundOptions.SectionName));
+
+var enableWebhookRetryBackground = builder.Configuration.GetValue<bool>("WebhookRetryBackground:Enabled", true);
+if (enableWebhookRetryBackground)
+{
+    builder.Services.AddHostedService<WebhookRetryBackgroundService>();
+}
 
 //PRODUCTION
 // File Storage Service
@@ -408,7 +437,7 @@ using (var scope = app.Services.CreateScope())
         Console.WriteLine($"CRITICAL ERROR: {ex.Message}");
 
         if (ex.InnerException != null)
-            Console.WriteLine($"INTERNAL ERROR: {ex.InnerException.Message}");        
+            Console.WriteLine($"INTERNAL ERROR: {ex.InnerException.Message}");
     }
 }
 // ===== END MIGRATIONS =====
@@ -607,6 +636,7 @@ app.Run();
 //                 );
 //                 await context.SaveChangesAsync();
 //                 Console.WriteLine("✅ Produtos inseridos!");
+
 //             }
 //         }
 //         catch (Exception ex)

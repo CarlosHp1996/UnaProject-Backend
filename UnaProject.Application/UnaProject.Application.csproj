@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Commands\Payments\Handlers\" />
+    <Folder Include="Configuration\" />
     <Folder Include="Queries\Payments\" />
   </ItemGroup>
 

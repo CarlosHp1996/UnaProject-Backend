@@ -18,6 +18,8 @@ namespace UnaProject.Infra.Data
         public DbSet<Payment> Payments { get; set; }
         public DbSet<Tracking> Trackings { get; set; }
         public DbSet<Address> Addresses { get; set; }
+        public DbSet<PaymentAuditLog> PaymentAuditLogs { get; set; }
+        public DbSet<WebhookRetryLog> WebhookRetryLogs { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -222,6 +224,89 @@ namespace UnaProject.Infra.Data
                     .WithMany(u => u.Addresses)
                     .HasForeignKey(a => a.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // PaymentAuditLog Configuration
+            modelBuilder.Entity<PaymentAuditLog>(entity =>
+            {
+                entity.ToTable("PaymentAuditLogs");
+                entity.HasKey(p => p.Id);
+
+                entity.Property(p => p.EventType)
+                    .IsRequired()
+                    .HasMaxLength(50);
+
+                entity.Property(p => p.Source)
+                    .IsRequired()
+                    .HasMaxLength(50);
+
+                entity.Property(p => p.EventData)
+                    .IsRequired();
+
+                entity.Property(p => p.UserId)
+                    .HasMaxLength(450);
+
+                entity.Property(p => p.IPAddress)
+                    .HasMaxLength(45); // IPv6 max length
+
+                entity.Property(p => p.UserAgent)
+                    .HasMaxLength(500);
+
+                entity.Property(p => p.AdditionalInfo)
+                    .HasColumnType("text");
+
+                entity.Property(p => p.CreatedAt)
+                    .IsRequired();
+
+                // Relationship with Payment
+                entity.HasOne(p => p.Payment)
+                      .WithMany()
+                      .HasForeignKey(p => p.PaymentId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // WebhookRetryLog Configuration  
+            modelBuilder.Entity<WebhookRetryLog>(entity =>
+            {
+                entity.ToTable("WebhookRetryLogs");
+                entity.HasKey(w => w.Id);
+
+                entity.Property(w => w.WebhookEventId)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(w => w.EventType)
+                    .IsRequired()
+                    .HasMaxLength(50);
+
+                entity.Property(w => w.PayloadHash)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(w => w.PayloadJson)
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                entity.Property(w => w.AttemptCount)
+                    .IsRequired();
+
+                entity.Property(w => w.IsProcessed)
+                    .IsRequired();
+
+                entity.Property(w => w.FirstAttemptAt)
+                    .IsRequired();
+
+                entity.Property(w => w.LastErrorMessage)
+                    .HasMaxLength(1000);
+
+                entity.Property(w => w.SuccessMessage)
+                    .HasMaxLength(500);
+
+                // Relationship with Payment
+                entity.HasOne(w => w.Payment)
+                      .WithMany()
+                      .HasForeignKey(w => w.PaymentId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }
