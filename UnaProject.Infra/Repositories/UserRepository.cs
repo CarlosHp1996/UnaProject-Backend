@@ -189,7 +189,7 @@ namespace UnaProject.Infra.Repositories
                         foreach (var addressInDb in addressesInDb)
                         {
                             if (!addressesFromRequest.ContainsKey(addressInDb.Id))
-                                user.Addresses.Remove(addressInDb);                            
+                                user.Addresses.Remove(addressInDb);
                         }
 
                         foreach (var addressDto in request.Addresses)
@@ -435,5 +435,41 @@ namespace UnaProject.Infra.Repositories
                 throw;
             }
         }
+
+        // ===== SOCIAL LOGIN METHODS =====
+        public async Task<ApplicationUser?> GetBySocialIdAsync(string provider, string providerId)
+        {
+            try
+            {
+                return provider.ToLower() switch
+                {
+                    "google" => await _context.Users.FirstOrDefaultAsync(u => u.GoogleId == providerId),
+                    "facebook" => await _context.Users.FirstOrDefaultAsync(u => u.FacebookId == providerId),
+                    _ => null
+                };
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<bool> HasSocialAccountAsync(string provider, string providerId)
+        {
+            try
+            {
+                return provider.ToLower() switch
+                {
+                    "google" => await _context.Users.AnyAsync(u => u.GoogleId == providerId),
+                    "facebook" => await _context.Users.AnyAsync(u => u.FacebookId == providerId),
+                    _ => false
+                };
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+        // ===== END SOCIAL LOGIN METHODS =====
     }
 }

@@ -10,6 +10,7 @@ namespace UnaProject.Application.Models.Dtos
         public string? PhoneNumber { get; set; }
         public string? Cpf { get; set; }
         public EnumGender? Gender { get; set; }
+        public string? ProfilePicture { get; set; }
         public ICollection<AddressDto>? Addresses { get; set; }
     }
 }

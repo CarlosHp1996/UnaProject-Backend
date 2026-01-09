@@ -171,6 +171,7 @@ builder.Services.AddScoped<ITrackingRepository, TrackingRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ISocialAuthService, SocialAuthService>();
 builder.Services.AddHttpClient();
 
 // AbacatePay Configuration
@@ -224,7 +225,9 @@ builder.Services.AddCors(options =>
             "https://www.unaestudiocriativo.com.br",
             //URLs for testing frontends in a development environment.
             "http://127.0.0.1:5502",
-            "http://localhost:5502"
+            "http://localhost:5502",
+            "http://localhost:3000",    // React dev
+            "http://localhost:5173"     // Vite dev
         )
               .AllowAnyMethod()
               .AllowAnyHeader()
@@ -311,6 +314,28 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 // ===== FIM JWT =====
+
+// ===== SOCIAL AUTH CONFIGURATION =====
+builder.Services.AddAuthentication()
+    .AddGoogle(options =>
+    {
+        options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "";
+        options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "";
+        options.CallbackPath = "/auth/social/google/callback";
+        options.Scope.Add("email");
+        options.Scope.Add("profile");
+        options.SaveTokens = true;
+    })
+    .AddFacebook(options =>
+    {
+        options.AppId = builder.Configuration["Authentication:Facebook:AppId"] ?? "";
+        options.AppSecret = builder.Configuration["Authentication:Facebook:AppSecret"] ?? "";
+        options.CallbackPath = "/auth/social/facebook/callback";
+        options.Scope.Add("email");
+        options.Scope.Add("public_profile");
+        options.SaveTokens = true;
+    });
+// ===== END SOCIAL AUTH =====
 
 // ===== SWAGGER CONFIGURATION =====
 builder.Services.AddEndpointsApiExplorer();

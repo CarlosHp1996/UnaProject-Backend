@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Resend;
 using System.Net.Mail;
 using System.Text.RegularExpressions;
@@ -6,51 +7,74 @@ using UnaProject.Application.Services.Interfaces;
 
 namespace UnaProject.Application.Services
 {
-    public class EmailService : IEmailService
+  public class EmailService : IEmailService
+  {
+    private readonly ResendClient? _resendClient;
+    private readonly string _senderEmail;
+    private readonly string _senderName;
+    private readonly bool _isConfigured;
+    private readonly ILogger<EmailService> _logger;
+
+    public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
     {
-        private readonly ResendClient _resendClient;
-        private readonly string _senderEmail;
-        private readonly string _senderName;
+      _logger = logger;
 
-        public EmailService(IConfiguration configuration)
-        {
-            var apiKey = Environment.GetEnvironmentVariable("API_KEY_RESEND_UNA") ??
-                         configuration["Resend:API_KEY_RESEND_UNA"];
+      var apiKey = Environment.GetEnvironmentVariable("API_KEY_RESEND_UNA") ??
+                   configuration["Resend:API_KEY_RESEND_UNA"];
 
-            if (string.IsNullOrWhiteSpace(apiKey))
-                throw new InvalidOperationException("The environment variable 'API_KEY_RESEND_UNA' is not configured..");
+      if (string.IsNullOrWhiteSpace(apiKey) || apiKey == "re_test_key_development")
+      {
+        _isConfigured = false;
+        _logger.LogWarning("EmailService is not configured with a valid API key. Email functionality will be disabled.");
+      }
+      else
+      {
+        _isConfigured = true;
+        _resendClient = (ResendClient)ResendClient.Create(apiKey);
+      }
 
-            _resendClient = (ResendClient)ResendClient.Create(apiKey);
+      _senderEmail = Environment.GetEnvironmentVariable("SENDER_EMAIL") ??
+                     configuration["Resend:SENDER_EMAIL"] ??
+                     "noreply@unaestudiocriativo.com.br";
 
-            _senderEmail = Environment.GetEnvironmentVariable("SENDER_EMAIL") ??
-                           configuration["Resend:SENDER_EMAIL"];
+      _senderName = Environment.GetEnvironmentVariable("SENDER_NAME_UNA") ??
+                    configuration["Resend:SENDER_NAME_UNA"] ??
+                    "Una Estudio Criativo";
+    }
 
-            _senderName = Environment.GetEnvironmentVariable("SENDER_NAME_UNA") ??
-                          configuration["Resend:SENDER_NAME_UNA"];
-        }
+    public async Task SendEmailAsync(string toEmail, string subject, string body)
+    {
+      if (!_isConfigured || _resendClient == null)
+      {
+        _logger.LogWarning("Email sending skipped - service not configured. Would send to {Email} with subject: {Subject}", toEmail, subject);
+        return;
+      }
 
-        public async Task SendEmailAsync(string toEmail, string subject, string body)
-        {
-            var emailMessage = new EmailMessage
-            {
-                From = $"{_senderName} <{_senderEmail}>",
-                To = new[] { toEmail },
-                Subject = subject,
-                HtmlBody = body
-            };
+      var emailMessage = new EmailMessage
+      {
+        From = $"{_senderName} <{_senderEmail}>",
+        To = new[] { toEmail },
+        Subject = subject,
+        HtmlBody = body
+      };
 
-            var response = await _resendClient.EmailSendAsync(emailMessage);
+      var response = await _resendClient.EmailSendAsync(emailMessage);
 
-            if (response.Exception != null)
-            {
-                throw new Exception($"Error sending email with Resend: {response.Exception.Message}");
-            }
-        }
+      if (response.Exception != null)
+      {
+        throw new Exception($"Error sending email with Resend: {response.Exception.Message}");
+      }
+    }
 
-        public async Task SendEmailConfirmationAsync(string email)
-        {
-            string subject = "Conta criada com sucesso - AJUSTAR##########################################";
-            string body = @"
+    public async Task SendEmailConfirmationAsync(string email)
+    {
+      if (!_isConfigured)
+      {
+        _logger.LogWarning("Email confirmation skipped - service not configured for: {Email}", email);
+        return;
+      }
+      string subject = "Conta criada com sucesso - AJUSTAR##########################################";
+      string body = @"
             <html>
               <body style='margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;'>
                 <table align='center' width='100%' cellpadding='0' cellspacing='0' style='max-width: 600px; background-color: #ffffff; margin: 20px auto; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);'>
@@ -84,13 +108,18 @@ namespace UnaProject.Application.Services
               </body>
             </html>";
 
-            await SendEmailAsync(email, subject, body);
-        }
+      await SendEmailAsync(email, subject, body);
+    }
 
-        public async Task SendEmailConfirmationOrderAsync(string email)
-        {
-            string subject = "Pedido realizado com sucesso - AJUSTAR##########################################";
-            string body = @"
+    public async Task SendEmailConfirmationOrderAsync(string email)
+    {
+      if (!_isConfigured)
+      {
+        _logger.LogWarning("Order confirmation email skipped - service not configured for: {Email}", email);
+        return;
+      }
+      string subject = "Pedido realizado com sucesso - AJUSTAR##########################################";
+      string body = @"
             <html>
               <body style='margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;'>
                 <table align='center' width='100%' cellpadding='0' cellspacing='0' style='max-width: 600px; background-color: #ffffff; margin: 20px auto; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);'>
@@ -123,15 +152,20 @@ namespace UnaProject.Application.Services
                 </table>
               </body>
             </html>";
-            await SendEmailAsync(email, subject, body);
-        }
+      await SendEmailAsync(email, subject, body);
+    }
 
-        public async Task SendEmailForgoutPasswordAsync(string email)
-        {
-            string encodedEmail = Uri.EscapeDataString(email);
+    public async Task SendEmailForgoutPasswordAsync(string email)
+    {
+      if (!_isConfigured)
+      {
+        _logger.LogWarning("Forgot password email skipped - service not configured for: {Email}", email);
+        return;
+      }
+      string encodedEmail = Uri.EscapeDataString(email);
 
-            string subject = "Recuperação de senha - AJUSTAR##########################################";
-            string body = $@"
+      string subject = "Recuperação de senha - AJUSTAR##########################################";
+      string body = $@"
             <html>
               <body style='margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;'>
                 <table align='center' width='100%' cellpadding='0' cellspacing='0' style='max-width: 600px; background-color: #ffffff; margin: 20px auto; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);'>
@@ -165,13 +199,18 @@ namespace UnaProject.Application.Services
                 </table>
               </body>
             </html>";
-            await SendEmailAsync(email, subject, body);
-        }
+      await SendEmailAsync(email, subject, body);
+    }
 
-        public async Task SendEmailConfirmationTrackingAsync(string email)
-        {
-            string subject = "Rastreamento do pedido - AJUSTAR##########################################";
-            string body = @"
+    public async Task SendEmailConfirmationTrackingAsync(string email)
+    {
+      if (!_isConfigured)
+      {
+        _logger.LogWarning("Tracking confirmation email skipped - service not configured for: {Email}", email);
+        return;
+      }
+      string subject = "Rastreamento do pedido - AJUSTAR##########################################";
+      string body = @"
             <html>
               <body style='margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;'>
                 <table align='center' width='100%' cellpadding='0' cellspacing='0' style='max-width: 600px; background-color: #ffffff; margin: 20px auto; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);'>
@@ -204,28 +243,28 @@ namespace UnaProject.Application.Services
                 </table>
                 </body>
             </html>";
-            await SendEmailAsync(email, subject, body);
-        }
-
-        public async Task<bool> IsValidEmailAsync(string email)
-        {
-            if (string.IsNullOrWhiteSpace(email))
-                return false;
-
-            try
-            {
-                var mailAddress = new MailAddress(email);
-
-                if (!email.Contains("@") || !email.Split('@')[1].Contains("."))
-                    return false;
-
-                var regex = new Regex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$");
-                return regex.IsMatch(email);
-            }
-            catch
-            {
-                return false;
-            }
-        }
+      await SendEmailAsync(email, subject, body);
     }
+
+    public async Task<bool> IsValidEmailAsync(string email)
+    {
+      if (string.IsNullOrWhiteSpace(email))
+        return false;
+
+      try
+      {
+        var mailAddress = new MailAddress(email);
+
+        if (!email.Contains("@") || !email.Split('@')[1].Contains("."))
+          return false;
+
+        var regex = new Regex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+        return regex.IsMatch(email);
+      }
+      catch
+      {
+        return false;
+      }
+    }
+  }
 }

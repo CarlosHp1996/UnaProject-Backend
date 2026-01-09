@@ -308,6 +308,18 @@ namespace UnaProject.Infra.Data
                       .HasForeignKey(w => w.PaymentId)
                       .OnDelete(DeleteBehavior.Cascade);
             });
+
+            // === APPLICATIONUSER CONFIGURATION FOR SOCIAL LOGIN ===
+            modelBuilder.Entity<ApplicationUser>(entity =>
+            {
+                entity.Property(e => e.GoogleId).HasMaxLength(255);
+                entity.Property(e => e.FacebookId).HasMaxLength(255);
+                entity.Property(e => e.ProfilePicture).HasColumnType("TEXT");
+                entity.Property(e => e.EmailVerified).HasDefaultValue(false);
+
+                entity.HasIndex(e => e.GoogleId).IsUnique().HasFilter("\"GoogleId\" IS NOT NULL");
+                entity.HasIndex(e => e.FacebookId).IsUnique().HasFilter("\"FacebookId\" IS NOT NULL");
+            });
         }
     }
 }

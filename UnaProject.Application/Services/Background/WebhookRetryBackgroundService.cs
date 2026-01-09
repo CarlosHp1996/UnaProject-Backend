@@ -44,7 +44,7 @@ namespace UnaProject.Application.Services.Background
                 {
                     _logger.LogError(ex, "Error in webhook retry background service");
 
-                    // Em caso de erro, aguardar um pouco antes de tentar novamente
+                    // If an error occurs, wait a moment before trying again.
                     await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
                 }
             }

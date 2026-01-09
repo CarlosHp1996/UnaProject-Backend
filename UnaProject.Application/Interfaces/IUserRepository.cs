@@ -13,5 +13,9 @@ namespace UnaProject.Application.Interfaces
         Task<bool> DeleteUser(Guid id, CancellationToken cancellationToken);
         Task<ApplicationUser> GetUserById(Guid id, CancellationToken cancellationToken);
         Task<AsyncOutResult<IEnumerable<ApplicationUser>, int>> GetUsers(GetUsersRequestFilter filter, CancellationToken cancellationToken);
+
+        // Social Login Methods
+        Task<ApplicationUser?> GetBySocialIdAsync(string provider, string providerId);
+        Task<bool> HasSocialAccountAsync(string provider, string providerId);
     }
 }
