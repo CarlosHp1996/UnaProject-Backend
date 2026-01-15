@@ -227,7 +227,8 @@ builder.Services.AddCors(options =>
             "http://127.0.0.1:5502",
             "http://localhost:5502",
             "http://localhost:3000",    // React dev
-            "http://localhost:5173"     // Vite dev
+            "http://localhost:5173",     // Vite dev
+            "https://localhost:5173"
         )
               .AllowAnyMethod()
               .AllowAnyHeader()
