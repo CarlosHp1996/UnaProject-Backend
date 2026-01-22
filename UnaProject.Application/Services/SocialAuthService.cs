@@ -189,8 +189,8 @@ namespace UnaProject.Application.Services
                 user.LastSocialLogin = DateTime.UtcNow;
 
                 // Update picture if not exists
-                if (!string.IsNullOrEmpty(socialUser.Picture) && string.IsNullOrEmpty(user.ProfilePicture))
-                    user.ProfilePicture = socialUser.Picture;
+                //if (!string.IsNullOrEmpty(socialUser.Picture) && string.IsNullOrEmpty(user.ProfilePicture))
+                user.ProfilePicture = socialUser.Picture;
 
                 await _userManager.UpdateAsync(user);
                 _logger.LogInformation("Social login data updated for user: {UserId}", user.Id);
