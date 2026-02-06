@@ -172,6 +172,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ISocialAuthService, SocialAuthService>();
+builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddHttpClient();
 
 // AbacatePay Configuration

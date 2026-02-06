@@ -2,8 +2,8 @@
 {
     public enum EnumCategory
     {
-        Teste1 = 1,
-        Teste2 = 2,
-        Teste3 = 3
+        Teste1 = 0,
+        Teste2 = 1,
+        Teste3 = 2
     }
 }

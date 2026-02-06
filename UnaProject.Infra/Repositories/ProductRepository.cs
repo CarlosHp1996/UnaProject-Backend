@@ -57,6 +57,12 @@ namespace UnaProject.Infra.Repositories
             if (filter.MaxPrice.HasValue)
                 query = query.Where(p => p.Price <= filter.MaxPrice.Value);
 
+            if (filter.StockQuantity.HasValue && filter.StockQuantity > 0)
+                query = query.Where(p => p.StockQuantity >= filter.StockQuantity.Value);
+
+            if (filter.StockQuantity.HasValue && filter.StockQuantity < 1)
+                query = query.Where(p => p.StockQuantity < 1);
+
             if (filter.IsActive.HasValue)
                 query = query.Where(p => p.IsActive == filter.IsActive.Value);
 

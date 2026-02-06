@@ -76,12 +76,11 @@ namespace UnaProject.Web.Controllers
             try
             {
                 var userId = GetUserId();
-                //var sessionCartId = $"session_{request.SessionId}";
+
                 var cartItem = new CartItem
                 {
                     ProductId = request.ProductId,
-                    Quantity = request.Quantity,
-                    Size = request.Size
+                    Quantity = request.Quantity
                 };
 
                 var cart = await _cartService.AddItemAsync(userId, cartItem);

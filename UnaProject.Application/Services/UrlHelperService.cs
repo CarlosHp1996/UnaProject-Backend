@@ -30,7 +30,7 @@ namespace UnaProject.Application.Services
             if (request != null)
             {
                 var baseUrl = $"{request.Scheme}://{request.Host}";
-                return $"{baseUrl}/imagens/{relativePath}";
+                return $"{baseUrl}/{relativePath}";
             }
 
             // Fallback for when there is no HTTP context
@@ -40,7 +40,7 @@ namespace UnaProject.Application.Services
             // Remove trailing slash from base URL if present
             fallbackBaseUrl = fallbackBaseUrl.TrimEnd('/');
 
-            return $"{fallbackBaseUrl}/imagens/{relativePath}";
+            return $"{fallbackBaseUrl}/{relativePath}";
         }
     }
 }

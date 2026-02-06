@@ -7,7 +7,6 @@
         public string ProductImage { get; set; }
         public decimal UnitPrice { get; set; }
         public int Quantity { get; set; }
-        public string? Size { get; set; }
         public decimal TotalPrice => UnitPrice * Quantity;
         public DateTime AddedAt { get; set; }
     }

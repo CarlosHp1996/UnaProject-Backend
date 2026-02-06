@@ -1,4 +1,5 @@
 ﻿using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using UnaProject.Application.Commands.Products;
@@ -26,6 +27,7 @@ namespace UnaProject.Web.Controllers
               Description = "Create a new product.")]
         [SwaggerResponse(200, "Success", typeof(Result<CreateProductResponse>))]
         [HttpPost("create")]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> Create([FromForm] CreateProductRequest request)
         {
             var command = new CreateProductCommand(request);
@@ -74,6 +76,7 @@ namespace UnaProject.Web.Controllers
             Description = "Update an existing product.")]
         [SwaggerResponse(200, "Success", typeof(Result<UpdateProductResponse>))]
         [HttpPut("update/{id}")]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> Update(Guid id, [FromForm] UpdateProductRequest request)
         {
             var command = new UpdateProductCommand(id, request);
@@ -90,6 +93,7 @@ namespace UnaProject.Web.Controllers
             Description = "Delete a product by ID.")]
         [SwaggerResponse(200, "Success", typeof(Result))]
         [HttpDelete("delete/{id}")]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var command = new DeleteProductCommand(id);

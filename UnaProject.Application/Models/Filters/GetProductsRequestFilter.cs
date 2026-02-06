@@ -9,6 +9,7 @@ namespace UnaProject.Application.Models.Filters
         public List<int>? QuantityRanges { get; set; } = new List<int>();
         public decimal? MinPrice { get; set; }
         public decimal? MaxPrice { get; set; }
+        public int? StockQuantity { get; set; }
         public bool? IsActive { get; set; }
     }
 }

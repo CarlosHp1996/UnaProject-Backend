@@ -68,9 +68,8 @@ namespace UnaProject.Application.Services
 
             if (product.StockQuantity < newItem.Quantity)
                 throw new Exception($"Insufficient stock. Available: {product.StockQuantity}");
-            var existingItem = cart.Items.FirstOrDefault(i =>
-                i.ProductId == newItem.ProductId &&
-                i.Size == newItem.Size);
+
+            var existingItem = cart.Items.FirstOrDefault(i => i.ProductId == newItem.ProductId);
 
             if (existingItem != null)
             {
@@ -169,9 +168,7 @@ namespace UnaProject.Application.Services
                 foreach (var sessionItem in sessionCart.Items)
                 {
                     // Check if the item already exists in the user's cart
-                    var existingItem = userCart.Items.FirstOrDefault(i =>
-                        i.ProductId == sessionItem.ProductId &&
-                        i.Size == sessionItem.Size);
+                    var existingItem = userCart.Items.FirstOrDefault(i => i.ProductId == sessionItem.ProductId);
 
                     if (existingItem != null)
                     {

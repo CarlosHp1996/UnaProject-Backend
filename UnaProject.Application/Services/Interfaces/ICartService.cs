@@ -11,7 +11,6 @@ namespace UnaProject.Application.Services.Interfaces
         Task<Cart> RemoveItemAsync(string userId, Guid productId);
         Task<bool> ClearCartAsync(string userId);
         Task<int> GetCartItemCountAsync(string userId);
-
         Task<Guid> ConvertCartToOrderAsync(string userId, AddressRequest shippingAddress);
         Task<Cart> MigrateSessionCartToUserAsync(string sessionCartId, string userId);
     }

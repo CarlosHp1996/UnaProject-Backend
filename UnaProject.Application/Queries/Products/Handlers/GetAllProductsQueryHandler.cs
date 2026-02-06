@@ -44,6 +44,7 @@ namespace UnaProject.Application.Queries.Products.Handlers
                         Attributes = p.Attributes?
                             .Select(a => new ProductAttributeDto
                             {
+                                Id = a.Id,
                                 Category = a.Category
                             }).ToList() ?? new List<ProductAttributeDto>()
                     }).ToList(),
