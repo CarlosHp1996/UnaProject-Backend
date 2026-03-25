@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
@@ -76,7 +76,7 @@ namespace UnaProject.Web.Controllers
             Description = "Update an existing product.")]
         [SwaggerResponse(200, "Success", typeof(Result<UpdateProductResponse>))]
         [HttpPut("update/{id}")]
-        [Authorize(Roles = "User,Admin")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(Guid id, [FromForm] UpdateProductRequest request)
         {
             var command = new UpdateProductCommand(id, request);
@@ -89,14 +89,14 @@ namespace UnaProject.Web.Controllers
         }
 
         [SwaggerOperation(
-            Summary = "Delete Product",
-            Description = "Delete a product by ID.")]
+            Summary = "Delete Products",
+            Description = "Delete one or more products by their IDs.")]
         [SwaggerResponse(200, "Success", typeof(Result))]
-        [HttpDelete("delete/{id}")]
-        [Authorize(Roles = "User,Admin")]
-        public async Task<IActionResult> Delete(Guid id)
+        [HttpDelete("delete")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Delete([FromBody] List<Guid> ids)
         {
-            var command = new DeleteProductCommand(id);
+            var command = new DeleteProductCommand(ids);
             var result = await _mediator.Send(command);
 
             if (result.HasSuccess)

@@ -83,7 +83,7 @@ namespace UnaProject.Application.Services
             else
             {
                 newItem.ProductName = product.Name;
-                newItem.ProductImage = product.ImageUrl;
+                newItem.ProductImage = product.ImageUrls?.FirstOrDefault() ?? "";
                 newItem.UnitPrice = product.Price;
                 newItem.AddedAt = DateTime.UtcNow;
 

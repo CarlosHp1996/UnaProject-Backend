@@ -16,7 +16,7 @@ namespace UnaProject.Application.Models.Requests.Products
         [Required]
         [Range(0, int.MaxValue)]
         public int StockQuantity { get; set; }
-        public IFormFile? ImageUrl { get; set; }
+        public List<IFormFile>? Images { get; set; } = new List<IFormFile>();
         [Required]
         public bool IsActive { get; set; } = true;
         public List<ProductAttributeRequest>? Attributes { get; set; } = new List<ProductAttributeRequest>();

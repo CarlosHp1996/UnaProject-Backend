@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
@@ -9,6 +10,7 @@ using UnaProject.Domain.Helpers;
 
 namespace UnaProject.Web.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class PaymentController : ControllerBase
@@ -94,6 +96,7 @@ namespace UnaProject.Web.Controllers
         [SwaggerResponse(200, "Webhook processed successfully")]
         [SwaggerResponse(400, "Error processing webhook")]
         [SwaggerResponse(500, "Internal server error")]
+        [AllowAnonymous]
         [HttpPost("webhook")]
         public async Task<IActionResult> ProcessWebhook([FromBody] object payload)
         {

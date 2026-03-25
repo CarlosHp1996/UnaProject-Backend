@@ -1,15 +1,15 @@
-﻿using MediatR;
+using MediatR;
 using UnaProject.Domain.Helpers;
 
 namespace UnaProject.Application.Commands.Products
 {
     public class DeleteProductCommand : IRequest<Result>
     {
-        public Guid Id { get; }
+        public List<Guid> Ids { get; }
 
-        public DeleteProductCommand(Guid id)
+        public DeleteProductCommand(List<Guid> ids)
         {
-            Id = id;
+            Ids = ids;
         }
     }
 }

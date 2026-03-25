@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
@@ -147,7 +147,7 @@ namespace UnaProject.Web.Controllers
                  Description = "Send a password recovery email to the user.")]
         [SwaggerResponse(200, "Success", typeof(Result<ForgoutPasswordResponse>))]
         [HttpPost("forgout-password")]
-        [Authorize(Roles = "User,Admin")]
+        [AllowAnonymous]
         public async Task<IActionResult> ForgoutPassword(string email)
         {
             var command = new ForgoutPasswordCommand(email);

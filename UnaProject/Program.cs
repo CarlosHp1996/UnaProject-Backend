@@ -643,7 +643,7 @@ app.Run();
 //                         Description = "Whey protein de alta qualidade para ganho de massa muscular.",
 //                         Price = 120.00m,
 //                         StockQuantity = 100,
-//                         ImageUrl = "/imagens/whey-protein.jpg",
+//                         ImageUrls = new List<string> { "/imagens/whey-protein.jpg" },
 //                         IsActive = true,
 //                         CreatedAt = DateTime.UtcNow,
 //                         UpdatedAt = DateTime.UtcNow
@@ -655,7 +655,7 @@ app.Run();
 //                         Description = "Suplemento para aumento de força e desempenho.",
 //                         Price = 80.00m,
 //                         StockQuantity = 150,
-//                         ImageUrl = "/imagens/creatina.jpg",
+//                         ImageUrls = new List<string> { "/imagens/creatina.jpg" },
 //                         IsActive = true,
 //                         CreatedAt = DateTime.UtcNow,
 //                         UpdatedAt = DateTime.UtcNow

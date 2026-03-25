@@ -39,7 +39,7 @@ namespace UnaProject.Application.Queries.Products.Handlers
                         Description = p.Description,
                         Price = p.Price,
                         StockQuantity = p.StockQuantity,
-                        ImageUrl = p.ImageUrl,
+                        ImageUrls = p.ImageUrls,
                         IsActive = p.IsActive,
                         Attributes = p.Attributes?
                             .Select(a => new ProductAttributeDto

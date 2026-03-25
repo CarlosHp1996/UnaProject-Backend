@@ -14,7 +14,8 @@ namespace UnaProject.Application.Models.Requests.Products
         public decimal? Price { get; set; }
         [Range(0, int.MaxValue)]
         public int? StockQuantity { get; set; }
-        public IFormFile? ImageUrl { get; set; }
+        public List<IFormFile>? NewImages { get; set; } = new List<IFormFile>();
+        public List<string>? RemovedImageUrls { get; set; } = new List<string>();
         public bool? IsActive { get; set; }
         public List<ProductAttributeDto>? Attributes { get; set; } = new List<ProductAttributeDto>();
         public Guid? InventoryId { get; set; }

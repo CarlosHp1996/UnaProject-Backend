@@ -46,8 +46,12 @@ namespace UnaProject.Infra.Data
                 entity.Property(p => p.StockQuantity)
                     .IsRequired();
 
-                entity.Property(p => p.ImageUrl)
-                    .HasMaxLength(500);
+                entity.Property(p => p.ImageUrls)
+                    .HasColumnType("text")
+                    .HasConversion(
+                        v => System.Text.Json.JsonSerializer.Serialize(v, default(System.Text.Json.JsonSerializerOptions)),
+                        v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(v, default(System.Text.Json.JsonSerializerOptions)) ?? new List<string>()
+                    );
 
                 entity.Property(p => p.IsActive)
                     .IsRequired();

@@ -228,9 +228,12 @@ namespace UnaProject.Infra.Repositories
             {
                 foreach (var item in order.OrderItems)
                 {
-                    if (item.Product != null)
+                    if (item.Product != null && item.Product.ImageUrls != null)
                     {
-                        item.Product.ImageUrl = _urlHelper.GenerateImageUrl(item.Product.ImageUrl);
+                        for (int i = 0; i < item.Product.ImageUrls.Count; i++)
+                        {
+                            item.Product.ImageUrls[i] = _urlHelper.GenerateImageUrl(item.Product.ImageUrls[i]);
+                        }
                     }
                 }
             }
@@ -253,9 +256,12 @@ namespace UnaProject.Infra.Repositories
             {
                 foreach (var item in order.OrderItems)
                 {
-                    if (item.Product != null)
+                    if (item.Product != null && item.Product.ImageUrls != null)
                     {
-                        item.Product.ImageUrl = _urlHelper.GenerateImageUrl(item.Product.ImageUrl);
+                        for (int i = 0; i < item.Product.ImageUrls.Count; i++)
+                        {
+                            item.Product.ImageUrls[i] = _urlHelper.GenerateImageUrl(item.Product.ImageUrls[i]);
+                        }
                     }
                 }
             }

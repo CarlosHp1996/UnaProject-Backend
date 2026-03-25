@@ -65,7 +65,7 @@ namespace UnaProject.Application.Queries.Orders.Handlers
                             OrderId = item.OrderId,
                             ProductId = item.ProductId,
                             ProductName = item.Product?.Name,
-                            ProductImageUrl = item.Product?.ImageUrl,
+                            ProductImageUrl = item.Product?.ImageUrls?.FirstOrDefault(),
                             Quantity = item.Quantity,
                             UnitPrice = item.UnitPrice
                         }).ToList() ?? new List<OrderItemDto>(),

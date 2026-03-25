@@ -36,7 +36,7 @@ namespace UnaProject.Application.Queries.Products.Handlers
                     Description = product.Description,
                     Price = product.Price,
                     StockQuantity = product.StockQuantity,
-                    ImageUrl = product.ImageUrl,
+                    ImageUrls = product.ImageUrls,
                     IsActive = product.IsActive,
                     CreatedAt = product.CreatedAt,
                     UpdatedAt = product.UpdatedAt,

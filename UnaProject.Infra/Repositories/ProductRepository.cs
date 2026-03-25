@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using UnaProject.Application.Interfaces;
 using UnaProject.Application.Models.Dtos;
 using UnaProject.Application.Models.Filters;
@@ -7,6 +7,7 @@ using UnaProject.Application.Models.Responses.Products;
 using UnaProject.Application.Services.Interfaces;
 using UnaProject.Domain.Entities;
 using UnaProject.Domain.Helpers;
+using UnaProject.Domain.Enums;
 using UnaProject.Infra.Data;
 
 namespace UnaProject.Infra.Repositories
@@ -30,6 +31,14 @@ namespace UnaProject.Infra.Repositories
             int pageSize = filter.PageSize ?? 10;
             int offset = (page - 1) * pageSize;
             string sortBy = filter.SortBy ?? "Name";
+            
+            // Normalize sortBy to match the property casing in the Product class
+            var property = typeof(Product).GetProperties()
+                .FirstOrDefault(p => string.Equals(p.Name, sortBy, StringComparison.OrdinalIgnoreCase));
+            
+            if (property != null)
+                sortBy = property.Name;
+
             bool ascending = filter.SortDirection?.ToLower() != "desc";
 
             var query = _context.Products
@@ -38,11 +47,20 @@ namespace UnaProject.Infra.Repositories
 
             if (!string.IsNullOrEmpty(filter.Name))
                 query = query.Where(p => EF.Functions.ILike(p.Name, $"%{filter.Name}%"));
+            else if (!string.IsNullOrEmpty(filter.Search))
+                query = query.Where(p => EF.Functions.ILike(p.Name, $"%{filter.Search}%"));
 
             if (filter.CategoryIds != null && filter.CategoryIds.Any())
             {
                 var categoryValues = filter.CategoryIds.Select(f => f).ToList();
                 query = query.Where(p => p.Attributes.Any(a => a.Category != null && categoryValues.Contains(a.Category.Value)));
+            }
+            else if (!string.IsNullOrEmpty(filter.Category) && filter.Category != "all")
+            {
+                if (Enum.TryParse<EnumCategory>(filter.Category, true, out var categoryEnum))
+                {
+                    query = query.Where(p => p.Attributes.Any(a => a.Category == categoryEnum));
+                }
             }
 
             if (filter.QuantityRanges != null && filter.QuantityRanges.Any())
@@ -78,7 +96,13 @@ namespace UnaProject.Infra.Repositories
             // Convert paths to full URLs
             foreach (var product in products)
             {
-                product.ImageUrl = _urlHelper.GenerateImageUrl(product.ImageUrl);
+                if (product.ImageUrls != null)
+                {
+                    for (int i = 0; i < product.ImageUrls.Count; i++)
+                    {
+                        product.ImageUrls[i] = _urlHelper.GenerateImageUrl(product.ImageUrls[i]);
+                    }
+                }
             }
 
             return new AsyncOutResult<IEnumerable<Product>, int>(products, totalCount);
@@ -120,13 +144,26 @@ namespace UnaProject.Infra.Repositories
                     .Include(p => p.Inventory)
                     .FirstOrDefaultAsync(p => p.Id == product.Id, cancellationToken) ?? throw new Exception($"Product with ID {product.Id} not found.");
 
-                string? imageUrl = null;
-                if (request.ImageUrl != null && request.ImageUrl.Length > 0)
+                if (request.NewImages != null && request.NewImages.Any())
                 {
-                    imageUrl = await _fileStorage.UploadFileAsync(
-                        request.ImageUrl,
-                        "images",
-                        $"{Guid.NewGuid()}_{request.ImageUrl.FileName}");
+                    foreach (var file in request.NewImages)
+                    {
+                        if (file.Length > 0)
+                        {
+                            var fileUrl = await _fileStorage.UploadFileAsync(
+                                file,
+                                "images",
+                                $"{Guid.NewGuid()}_{file.FileName}");
+                            existingProduct.ImageUrls.Add(fileUrl);
+                        }
+                    }
+                }
+                if (request.RemovedImageUrls != null && request.RemovedImageUrls.Any())
+                {
+                    foreach (var urlToRemove in request.RemovedImageUrls)
+                    {
+                        existingProduct.ImageUrls.RemoveAll(img => urlToRemove.Contains(img) || img.Contains(urlToRemove));
+                    }
                 }                
 
                 if (request.Name != null)
@@ -137,8 +174,7 @@ namespace UnaProject.Infra.Repositories
                     existingProduct.Price = (decimal)request.Price;
                 if (request.StockQuantity is not null)
                     existingProduct.StockQuantity = (int)request.StockQuantity;
-                if (imageUrl != null)
-                    existingProduct.ImageUrl = imageUrl;
+
                 if (request.IsActive is not null)
                     existingProduct.IsActive = (bool)request.IsActive;
                 existingProduct.UpdatedAt = DateTime.UtcNow;
@@ -185,7 +221,7 @@ namespace UnaProject.Infra.Repositories
                     Description = product.Description,
                     Price = product.Price,
                     StockQuantity = product.StockQuantity,
-                    ImageUrl = product.ImageUrl,
+                    ImageUrls = product.ImageUrls,
                     IsActive = product.IsActive,
                     UpdatedAt = product.UpdatedAt,
                     InventoryId = product.Inventory.Id,
@@ -213,8 +249,13 @@ namespace UnaProject.Infra.Repositories
             .Include(p => p.OrderItems)
             .FirstOrDefaultAsync();
 
-            if (product != null)
-                product.ImageUrl = _urlHelper.GenerateImageUrl(product.ImageUrl);            
+            if (product != null && product.ImageUrls != null)
+            {
+                for (int i = 0; i < product.ImageUrls.Count; i++)
+                {
+                    product.ImageUrls[i] = _urlHelper.GenerateImageUrl(product.ImageUrls[i]);
+                }
+            }
 
             return product;
         }
@@ -223,13 +264,20 @@ namespace UnaProject.Infra.Repositories
         {
             try
             {
-                string? imageUrl = null;
-                if (request.ImageUrl != null && request.ImageUrl.Length > 0)
+                var imageUrls = new List<string>();
+                if (request.Images != null && request.Images.Any())
                 {
-                    imageUrl = await _fileStorage.UploadFileAsync(
-                        request.ImageUrl,
-                        "images",
-                        $"{Guid.NewGuid()}_{request.ImageUrl.FileName}");
+                    foreach (var file in request.Images)
+                    {
+                        if (file.Length > 0)
+                        {
+                            var fileUrl = await _fileStorage.UploadFileAsync(
+                                file,
+                                "images",
+                                $"{Guid.NewGuid()}_{file.FileName}");
+                            imageUrls.Add(fileUrl);
+                        }
+                    }
                 }
 
                 var now = DateTime.UtcNow;
@@ -240,7 +288,7 @@ namespace UnaProject.Infra.Repositories
                     Description = request.Description,
                     Price = request.Price,
                     StockQuantity = request.StockQuantity,
-                    ImageUrl = imageUrl,
+                    ImageUrls = imageUrls,
                     IsActive = request.IsActive,
                     CreatedAt = now,
                     UpdatedAt = now
@@ -258,17 +306,20 @@ namespace UnaProject.Infra.Repositories
                 _context.Inventories.Add(inventory);
 
                 var productAttributes = new List<ProductAttribute>();
-                foreach (var attr in request.Attributes)
+                if (request.Attributes != null)
                 {
-                    var productAttribute = new ProductAttribute
+                    foreach (var attr in request.Attributes)
                     {
-                        Id = Guid.NewGuid(),
-                        ProductId = product.Id,
-                        Category = attr.Category
-                    };
+                        var productAttribute = new ProductAttribute
+                        {
+                            Id = Guid.NewGuid(),
+                            ProductId = product.Id,
+                            Category = attr.Category
+                        };
 
-                    _context.ProductAttributes.Add(productAttribute);
-                    productAttributes.Add(productAttribute);
+                        _context.ProductAttributes.Add(productAttribute);
+                        productAttributes.Add(productAttribute);
+                    }
                 }
 
                 // Salvar todas as alterações de uma vez
@@ -282,7 +333,7 @@ namespace UnaProject.Infra.Repositories
                     Description = product.Description,
                     Price = product.Price,
                     StockQuantity = product.StockQuantity,
-                    ImageUrl = product.ImageUrl,
+                    ImageUrls = product.ImageUrls,
                     IsActive = product.IsActive,
                     CreatedAt = product.CreatedAt,
                     UpdatedAt = product.UpdatedAt,

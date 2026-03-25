@@ -1,9 +1,10 @@
-﻿namespace UnaProject.Domain.Enums
+namespace UnaProject.Domain.Enums
 {
     public enum EnumCategory
     {
-        Teste1 = 0,
-        Teste2 = 1,
-        Teste3 = 2
+        Canecas = 0,
+        Pratos = 1,
+        Placas = 2,
+        Personalizados = 3
     }
 }

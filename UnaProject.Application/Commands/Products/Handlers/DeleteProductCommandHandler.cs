@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using UnaProject.Application.Interfaces;
 using UnaProject.Domain.Helpers;
 
@@ -18,29 +18,52 @@ namespace UnaProject.Application.Commands.Products.Handlers
             try
             {
                 var result = new Result();
-                var product = await _productRepository.GetById(request.Id);
+                var productsToDelete = new List<UnaProject.Domain.Entities.Product>();
+                var errors = new List<string>();
 
-                if (product is null)
+                foreach (var id in request.Ids)
                 {
-                    result.WithNotFound("Product not found!");
-                    return result;
+                    var product = await _productRepository.GetById(id);
+
+                    if (product is null)
+                    {
+                        errors.Add($"Product with ID {id} not found.");
+                        continue;
+                    }
+
+                    if (product.OrderItems != null && product.OrderItems.Count > 0)
+                    {
+                        errors.Add($"The product '{product.Name}' cannot be deleted because there is already an order created for it!");
+                        continue;
+                    }
+
+                    productsToDelete.Add(product);
                 }
 
-                if (product.OrderItems.Count > 0)
+                if (productsToDelete.Any())
                 {
-                    result.WithNotFound("The product cannot be deleted because there is already an order created for it!");
-                    return result;
+                    await _productRepository.DeleteRangeAsync(productsToDelete);
                 }
 
-                await _productRepository.DeleteAsync(product);
+                if (errors.Any())
+                {
+                    result.Message = string.Join(" | ", errors);
+                    result.HasSuccess = productsToDelete.Any(); // Parcial success if at least one was deleted
+                    if (!productsToDelete.Any()) result.WithError(result.Message);
+                }
+                else
+                {
+                    result.Message = request.Ids.Count > 1 
+                        ? $"{productsToDelete.Count} products deleted successfully!" 
+                        : "Product deleted successfully!";
+                    result.HasSuccess = true;
+                }
 
-                result.Message = "Product deleted successfully!";
-                result.HasSuccess = true;
                 return result;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                throw;
+                throw new Exception($"Error during bulk deletion: {ex.Message}", ex);
             }
         }
     }
