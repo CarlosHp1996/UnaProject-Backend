@@ -25,7 +25,7 @@ namespace UnaProject.Application.Commands.Payments.Handlers
                 _logger.LogInformation("Cancelling payment: {PaymentId} - Reason: {Reason}",
                     request.PaymentId, request.Reason);
 
-                var result = await _paymentRepository.CancelPayment(request.PaymentId, request.Reason, cancellationToken);
+                var result = await _paymentRepository.CancelPayment(request.PaymentId, request.Reason, request.UserId, request.IsAdmin, cancellationToken);
 
                 if (!result.HasSuccess)
                 {

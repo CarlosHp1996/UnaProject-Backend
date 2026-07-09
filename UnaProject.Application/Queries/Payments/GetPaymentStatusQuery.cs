@@ -4,5 +4,6 @@ using UnaProject.Domain.Helpers;
 
 namespace UnaProject.Application.Queries.Payments
 {
-    public record GetPaymentStatusQuery(Guid PaymentId) : IRequest<Result<PaymentStatusDto>>;
+    // UserId/IsAdmin são preenchidos pelo controller a partir das claims do JWT — nunca do corpo.
+    public record GetPaymentStatusQuery(Guid PaymentId, Guid UserId = default, bool IsAdmin = false) : IRequest<Result<PaymentStatusDto>>;
 }

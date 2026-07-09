@@ -37,7 +37,10 @@ namespace UnaProject.Application.Commands.Payments.Handlers
                     CustomerEmail = request.CustomerEmail,
                     CustomerPhone = request.CustomerPhone,
                     ReturnUrl = request.ReturnUrl,
-                    Metadata = request.Metadata
+                    Metadata = request.Metadata,
+                    // Vindos das claims do JWT (via command), nunca do corpo da requisição.
+                    UserId = request.UserId,
+                    IsAdmin = request.IsAdmin
                 };
 
                 var result = await _paymentRepository.CreateAbacatePayment(paymentRequest, cancellationToken);

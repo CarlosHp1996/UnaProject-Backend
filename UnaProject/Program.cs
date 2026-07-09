@@ -186,6 +186,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ISocialAuthService, SocialAuthService>();
+builder.Services.AddScoped<ISocialTokenValidator, SocialTokenValidator>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddHttpClient();
 
@@ -253,20 +254,31 @@ builder.Services.AddScoped<IPaymentGatewayResolver>(sp =>
 // ===== END STRIPE CONFIGURATION =====
 
 // CORS Configuration
+// Produção: apenas os domínios https oficiais. As origens localhost/127.0.0.1 só entram
+// em Development. AllowCredentials continua restrito a origens específicas (sem AllowAnyOrigin).
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins(
+        var allowedOrigins = new List<string>
+        {
             "https://unaestudiocriativo.com.br",
-            "https://www.unaestudiocriativo.com.br",
-            //URLs for testing frontends in a development environment.
-            "http://127.0.0.1:5502",
-            "http://localhost:5502",
-            "http://localhost:3000",    // React dev
-            "http://localhost:5173",     // Vite dev
-            "https://localhost:5173"
-        )
+            "https://www.unaestudiocriativo.com.br"
+        };
+
+        if (builder.Environment.IsDevelopment())
+        {
+            allowedOrigins.AddRange(new[]
+            {
+                "http://127.0.0.1:5502",
+                "http://localhost:5502",
+                "http://localhost:3000",    // React dev
+                "http://localhost:5173",    // Vite dev
+                "https://localhost:5173"
+            });
+        }
+
+        policy.WithOrigins(allowedOrigins.ToArray())
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
@@ -582,7 +594,8 @@ app.UseSwaggerUI(c =>
 //app.UseStripeConfiguration();
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+// Nota: os arquivos estáticos já são servidos pelo app.UseStaticFiles(new StaticFileOptions{...})
+// configurado acima (RequestPath=""). A chamada parameterless duplicada foi removida (M-5).
 app.UseRouting();
 app.UseAuthentication();
 app.UseSession();

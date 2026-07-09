@@ -27,6 +27,7 @@ namespace UnaProject.Web.Controllers
              Description = "Adds a new event to an order's tracking history")]
         [SwaggerResponse(200, "Success", typeof(Result<TrackingResponse>))]
         [HttpPost]
+        [Authorize(Roles = "Admin,Operator")]
         public async Task<IActionResult> Create([FromBody] CreateTrackingRequest request)
         {
             var command = new CreateTrackingCommand(request);
@@ -43,7 +44,7 @@ namespace UnaProject.Web.Controllers
          Description = "The 'Id' of the tracking event is required.")]
         [SwaggerResponse(200, "Success", typeof(Result<TrackingResponse>))]
         [HttpPut("{id}")]
-        //[Authorize(Roles = "Admin,Operator")]
+        [Authorize(Roles = "Admin,Operator")]
         public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTrackingRequest request)
         {
             var command = new UpdateTrackingCommand(id, request);
@@ -89,6 +90,7 @@ namespace UnaProject.Web.Controllers
             Description = "The 'Id' of the tracking event is required.")]
         [SwaggerResponse(200, "Success", typeof(Result<TrackingResponse>))]
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin,Operator")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var command = new DeleteTrackingCommand(id);

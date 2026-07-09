@@ -9,7 +9,6 @@ namespace UnaProject.Application.Services.Interfaces
         Task<SocialAuthResponse> ProcessSocialUserAsync(SocialUserInfo socialUser);
         Task<ApplicationUser> CreateUserFromSocialAsync(SocialUserInfo socialUser);
         Task<ApplicationUser> LinkSocialAccountAsync(ApplicationUser user, SocialUserInfo socialUser);
-        Task<bool> ValidateProviderTokenAsync(string provider, string token, string providerId);
         Task UpdateSocialLoginAsync(ApplicationUser user, SocialUserInfo socialUser);
     }
 }

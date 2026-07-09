@@ -77,9 +77,10 @@ namespace UnaProject.Application.Services
             }
             catch (StripeException ex)
             {
-                _logger.LogError(ex, "Stripe error creating PaymentIntent for order: {OrderId}", request.OrderId);
+                _logger.LogError(ex, "Stripe error creating PaymentIntent for order: {OrderId} - {StripeError}",
+                    request.OrderId, ex.StripeError?.Message ?? ex.Message);
                 var result = new Result<GatewayPaymentResult>();
-                result.WithError($"Stripe error: {ex.StripeError?.Message ?? ex.Message}");
+                result.WithError("Erro ao processar pagamento");
                 return result;
             }
             catch (Exception ex)
@@ -111,9 +112,10 @@ namespace UnaProject.Application.Services
             }
             catch (StripeException ex)
             {
-                _logger.LogError(ex, "Stripe error getting PaymentIntent status: {ExternalId}", externalId);
+                _logger.LogError(ex, "Stripe error getting PaymentIntent status: {ExternalId} - {StripeError}",
+                    externalId, ex.StripeError?.Message ?? ex.Message);
                 var result = new Result<GatewayPaymentStatus>();
-                result.WithError($"Stripe error: {ex.StripeError?.Message ?? ex.Message}");
+                result.WithError("Erro ao consultar pagamento");
                 return result;
             }
             catch (Exception ex)
@@ -138,9 +140,10 @@ namespace UnaProject.Application.Services
             }
             catch (StripeException ex)
             {
-                _logger.LogError(ex, "Stripe error cancelling PaymentIntent: {ExternalId}", externalId);
+                _logger.LogError(ex, "Stripe error cancelling PaymentIntent: {ExternalId} - {StripeError}",
+                    externalId, ex.StripeError?.Message ?? ex.Message);
                 var result = new ResultValue<bool>();
-                result.WithError($"Stripe error: {ex.StripeError?.Message ?? ex.Message}");
+                result.WithError("Erro ao cancelar pagamento");
                 return result;
             }
             catch (Exception ex)
@@ -194,12 +197,24 @@ namespace UnaProject.Application.Services
                 var stripeEvent = EventUtility.ParseEvent(rawPayload, throwOnApiVersionMismatch: false);
                 var paymentIntent = stripeEvent.Data?.Object as PaymentIntent;
 
+                // Para verificação de valor (A-2): usa amount_received quando disponível
+                // (valor efetivamente capturado); senão cai no amount do PaymentIntent.
+                long? amountReceivedCents = null;
+                if (paymentIntent != null)
+                {
+                    amountReceivedCents = paymentIntent.AmountReceived > 0
+                        ? paymentIntent.AmountReceived
+                        : paymentIntent.Amount;
+                }
+
                 var gatewayEvent = new GatewayWebhookEvent
                 {
                     EventType = stripeEvent.Type,
                     ExternalId = paymentIntent?.Id ?? string.Empty,
                     Status = MapStatus(paymentIntent?.Status ?? string.Empty),
-                    RawPayload = rawPayload
+                    RawPayload = rawPayload,
+                    AmountReceivedCents = amountReceivedCents,
+                    Currency = paymentIntent?.Currency
                 };
 
                 return Task.FromResult(Result<GatewayWebhookEvent>.Success(gatewayEvent));

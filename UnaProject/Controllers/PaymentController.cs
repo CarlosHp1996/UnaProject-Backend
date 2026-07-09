@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -39,6 +40,10 @@ namespace UnaProject.Web.Controllers
         [HttpPost("create")]
         public async Task<IActionResult> CreatePayment([FromBody] CreateAbacatePaymentRequest request)
         {
+            var userId = GetAuthenticatedUserId();
+            if (userId == Guid.Empty && !IsAdmin())
+                return Unauthorized(new { error = "Invalid user token" });
+
             var command = new CreatePaymentCommand(
                 request.OrderId,
                 request.Amount,
@@ -48,7 +53,9 @@ namespace UnaProject.Web.Controllers
                 request.CustomerEmail,
                 request.CustomerPhone,
                 request.ReturnUrl,
-                request.Metadata
+                request.Metadata,
+                userId,
+                IsAdmin()
             );
 
             var response = await _mediator.Send(command);
@@ -68,7 +75,7 @@ namespace UnaProject.Web.Controllers
         [HttpGet("{id}/status")]
         public async Task<IActionResult> GetPaymentStatus(Guid id)
         {
-            var query = new GetPaymentStatusQuery(id);
+            var query = new GetPaymentStatusQuery(id, GetAuthenticatedUserId(), IsAdmin());
 
             var response = await _mediator.Send(query);
 
@@ -88,7 +95,11 @@ namespace UnaProject.Web.Controllers
         [HttpPost("{id}/cancel")]
         public async Task<IActionResult> CancelPayment(Guid id, [FromBody] CancelPaymentRequest? request)
         {
-            var command = new CancelPaymentCommand(id, request?.Reason ?? "Cancellation requested by user");
+            var command = new CancelPaymentCommand(
+                id,
+                request?.Reason ?? "Cancellation requested by user",
+                GetAuthenticatedUserId(),
+                IsAdmin());
 
             var response = await _mediator.Send(command);
 
@@ -210,7 +221,7 @@ namespace UnaProject.Web.Controllers
         [HttpGet("{id}/qrcode")]
         public async Task<IActionResult> GetPaymentQrCode(Guid id)
         {
-            var query = new GetPaymentStatusQuery(id);
+            var query = new GetPaymentStatusQuery(id, GetAuthenticatedUserId(), IsAdmin());
             var response = await _mediator.Send(query);
 
             if (response.HasSuccess && !string.IsNullOrEmpty(response.Value?.QrCode))
@@ -227,13 +238,11 @@ namespace UnaProject.Web.Controllers
         public async Task<IActionResult> GetStatistics()
         {
             Guid? userId = null;
-            if (!User.IsInRole("Admin"))
+            if (!IsAdmin())
             {
-                var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                if (Guid.TryParse(userIdClaim, out var parsedId))
-                {
-                    userId = parsedId;
-                }
+                var id = GetAuthenticatedUserId();
+                if (id != Guid.Empty)
+                    userId = id;
             }
 
             var query = new GetPaymentStatisticsQuery(userId);
@@ -244,5 +253,20 @@ namespace UnaProject.Web.Controllers
 
             return BadRequest(response);
         }
+
+        /// <summary>
+        /// Extrai o Id do usuário autenticado das claims do JWT.
+        /// Tenta NameIdentifier (mapeado de "sub"), depois "sub" e "id" como fallback.
+        /// </summary>
+        private Guid GetAuthenticatedUserId()
+        {
+            var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value
+                ?? User.FindFirst("id")?.Value;
+
+            return Guid.TryParse(claim, out var userId) ? userId : Guid.Empty;
+        }
+
+        private bool IsAdmin() => User.IsInRole("Admin");
     }
 }

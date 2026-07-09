@@ -202,22 +202,6 @@ namespace UnaProject.Application.Services
             }
         }
 
-        public async Task<bool> ValidateProviderTokenAsync(string provider, string token, string providerId)
-        {
-            try
-            {
-                // Future implementation to validate tokens with external APIs
-                // For now, returns true assuming the OAuth middleware has already validated
-                await Task.CompletedTask;
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error validating provider token {Provider}", provider);
-                return false;
-            }
-        }
-
         private string GenerateUserNameFromEmail(string email)
         {
             // Generate unique username based on email

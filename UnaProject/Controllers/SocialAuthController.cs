@@ -20,77 +20,49 @@ namespace UnaProject.Web.Controllers
         }
 
         /// <summary>
-        /// It processes authentication via Google OAuth.
+        /// Processes authentication via Google OAuth. The client sends only the accessToken;
+        /// the profile is derived by validating the token server-side.
         /// </summary>
-        /// <param name="request">Social user data for authentication</param>
-        /// <returns>Response with JWT token and user data</returns>
         [HttpPost("google")]
         [AllowAnonymous]
-        public async Task<IActionResult> GoogleLogin([FromBody] SocialAuthRequest request)
-        {
-            try
-            {
-                _logger.LogInformation("Starting authentication via Google for provider: {Provider}", request.SocialUser.Provider);
-
-                if (request.SocialUser.Provider?.ToLower() != "google")
-                {
-                    _logger.LogWarning("Invalid provider received: {Provider}", request.SocialUser.Provider);
-                    return BadRequest(new { Message = "Provider must be 'google'" });
-                }
-
-                var command = new ProcessSocialAuthCommand(request.SocialUser);
-                var result = await _mediator.Send(command);
-
-                if (result.HasSuccess)
-                {
-                    _logger.LogInformation("Google authentication successful for user: {Email}", request.SocialUser.Email);
-                    return Ok(result.Value);
-                }
-
-                _logger.LogWarning("Google authentication failed: {Error}", result.ErrorMessage);
-                return BadRequest(new { Message = result.ErrorMessage });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during Google authentication");
-                return StatusCode(500, new { Message = "Internal server error" });
-            }
-        }
+        public Task<IActionResult> GoogleLogin([FromBody] SocialAuthRequest request)
+            => ProcessLogin("google", request);
 
         /// <summary>
-        /// Process authentication via Facebook OAuth
+        /// Processes authentication via Facebook OAuth. The client sends only the accessToken;
+        /// the profile is derived by validating the token server-side.
         /// </summary>
-        /// <param name="request">Social user data for authentication</param>
-        /// <returns>Response with JWT token and user data</returns>
         [HttpPost("facebook")]
         [AllowAnonymous]
-        public async Task<IActionResult> FacebookLogin([FromBody] SocialAuthRequest request)
+        public Task<IActionResult> FacebookLogin([FromBody] SocialAuthRequest request)
+            => ProcessLogin("facebook", request);
+
+        private async Task<IActionResult> ProcessLogin(string provider, SocialAuthRequest request)
         {
             try
             {
-                _logger.LogInformation("Starting authentication via Facebook for provider: {Provider}", request.SocialUser.Provider);
+                _logger.LogInformation("Starting social authentication for provider: {Provider}", provider);
 
-                if (request.SocialUser.Provider?.ToLower() != "facebook")
+                if (request == null || string.IsNullOrWhiteSpace(request.AccessToken))
                 {
-                    _logger.LogWarning("Invalid provider received: {Provider}", request.SocialUser.Provider);
-                    return BadRequest(new { Message = "Provider must be 'facebook'" });
+                    return BadRequest(new { Message = "accessToken is required." });
                 }
 
-                var command = new ProcessSocialAuthCommand(request.SocialUser);
+                var command = new ProcessSocialAuthCommand(provider, request.AccessToken);
                 var result = await _mediator.Send(command);
 
                 if (result.HasSuccess)
                 {
-                    _logger.LogInformation("Facebook authentication successful for user: {Email}", request.SocialUser.Email);
+                    _logger.LogInformation("{Provider} authentication successful", provider);
                     return Ok(result.Value);
                 }
 
-                _logger.LogWarning("Facebook authentication failed: {Error}", result.ErrorMessage);
+                _logger.LogWarning("{Provider} authentication failed: {Error}", provider, result.ErrorMessage);
                 return BadRequest(new { Message = result.ErrorMessage });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during Facebook authentication");
+                _logger.LogError(ex, "Error during {Provider} authentication", provider);
                 return StatusCode(500, new { Message = "Internal server error" });
             }
         }
@@ -98,13 +70,10 @@ namespace UnaProject.Web.Controllers
         /// <summary>
         /// Callback for Google authentication (optional for web flow)
         /// </summary>
-        /// <returns>Redirect to frontend with tokens</returns>
         [HttpGet("google/callback")]
         [AllowAnonymous]
         public IActionResult GoogleCallback()
         {
-            // This endpoint can be used for traditional web flow
-            // For now, we return information about the mobile/SPA flow
             return Ok(new
             {
                 Message = "Use the POST /api/socialauth/google endpoint for token-based authentication",
@@ -116,13 +85,10 @@ namespace UnaProject.Web.Controllers
         /// <summary>
         /// Callback for Facebook authentication (optional for web flow)
         /// </summary>
-        /// <returns>Redirect to frontend with tokens</returns>
         [HttpGet("facebook/callback")]
         [AllowAnonymous]
         public IActionResult FacebookCallback()
         {
-            // This endpoint can be used for traditional web flow
-            // For now, we return information about the mobile/SPA flow
             return Ok(new
             {
                 Message = "Use the POST /api/socialauth/facebook endpoint for token-based authentication",
@@ -132,35 +98,39 @@ namespace UnaProject.Web.Controllers
         }
 
         /// <summary>
-        /// Links a social account to an existing user
+        /// Links a social account to the authenticated user. The provider comes from the route
+        /// and the accessToken is validated server-side before linking.
         /// </summary>
-        /// <param name="request">Social account data to link</param>
-        /// <returns>Confirmation of the link</returns>
-        [HttpPost("link")]
+        [HttpPost("link/{provider}")]
         [Authorize]
-        public async Task<IActionResult> LinkSocialAccount([FromBody] SocialAuthRequest request)
+        public async Task<IActionResult> LinkSocialAccount(string provider, [FromBody] SocialAuthRequest request)
         {
             try
             {
-                _logger.LogInformation("Linking social account {Provider} to authenticated user", request.SocialUser.Provider);
-                // Get the current user's ID from the JWT token
+                _logger.LogInformation("Linking social account {Provider} to authenticated user", provider);
+
                 var userIdClaim = User.FindFirst("Id")?.Value;
                 if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
                 {
-                    _logger.LogWarning("Invalid user ID in token: {UserIdClaim}", userIdClaim);
+                    _logger.LogWarning("Invalid user ID in token");
                     return Unauthorized(new { Message = "Invalid user token" });
                 }
 
-                var command = new ProcessSocialAuthCommand(request.SocialUser);
+                if (request == null || string.IsNullOrWhiteSpace(request.AccessToken))
+                {
+                    return BadRequest(new { Message = "accessToken is required." });
+                }
+
+                var command = new ProcessSocialAuthCommand(provider, request.AccessToken);
                 var result = await _mediator.Send(command);
 
                 if (result.HasSuccess)
                 {
-                    _logger.LogInformation("Social account {Provider} linked successfully to user {UserId}", request.SocialUser.Provider, userId);
-                    return Ok(new { Message = $"Social account {request.SocialUser.Provider} linked successfully", User = result.Value?.User });
+                    _logger.LogInformation("Social account {Provider} linked successfully to user {UserId}", provider, userId);
+                    return Ok(new { Message = $"Social account {provider} linked successfully", User = result.Value?.User });
                 }
 
-                _logger.LogWarning("Failed to link social account {Provider}: {Error}", request.SocialUser.Provider, result.ErrorMessage);
+                _logger.LogWarning("Failed to link social account {Provider}: {Error}", provider, result.ErrorMessage);
                 return BadRequest(new { Message = result.ErrorMessage });
             }
             catch (Exception ex)

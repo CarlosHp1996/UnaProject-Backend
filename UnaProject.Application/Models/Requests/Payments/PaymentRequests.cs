@@ -13,6 +13,11 @@ namespace UnaProject.Application.Models.Requests.Payments
         public string? Metadata { get; set; }
         public List<ProductBillingRequest>? Products { get; set; }
         public string? CompletionUrl { get; set; }
+
+        // Preenchidos pelo handler a partir das claims do JWT (NÃO do corpo da requisição).
+        // O controller nunca copia estes campos do body para o command.
+        public Guid UserId { get; set; }
+        public bool IsAdmin { get; set; }
     }
 
     public class CancelPaymentRequest

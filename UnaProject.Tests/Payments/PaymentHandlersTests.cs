@@ -127,7 +127,7 @@ namespace UnaProject.Tests.Payments
             var paymentId = Guid.NewGuid();
 
             var repo = new Mock<IPaymentRepository>();
-            repo.Setup(r => r.CancelPayment(paymentId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            repo.Setup(r => r.CancelPayment(paymentId, It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(ResultValue<bool>.Success(true));
 
             var handler = new CancelPaymentCommandHandler(repo.Object, NullLogger<CancelPaymentCommandHandler>.Instance);
@@ -146,7 +146,7 @@ namespace UnaProject.Tests.Payments
             failed.WithError("pagamento já capturado");
 
             var repo = new Mock<IPaymentRepository>();
-            repo.Setup(r => r.CancelPayment(paymentId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            repo.Setup(r => r.CancelPayment(paymentId, It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(failed);
 
             var handler = new CancelPaymentCommandHandler(repo.Object, NullLogger<CancelPaymentCommandHandler>.Instance);
@@ -163,7 +163,7 @@ namespace UnaProject.Tests.Payments
             var paymentId = Guid.NewGuid();
 
             var repo = new Mock<IPaymentRepository>();
-            repo.Setup(r => r.CancelPayment(paymentId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            repo.Setup(r => r.CancelPayment(paymentId, It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new Exception("db down"));
 
             var handler = new CancelPaymentCommandHandler(repo.Object, NullLogger<CancelPaymentCommandHandler>.Instance);
@@ -181,8 +181,8 @@ namespace UnaProject.Tests.Payments
             string? capturedReason = null;
 
             var repo = new Mock<IPaymentRepository>();
-            repo.Setup(r => r.CancelPayment(paymentId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                .Callback<Guid, string, CancellationToken>((_, reason, _) => capturedReason = reason)
+            repo.Setup(r => r.CancelPayment(paymentId, It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+                .Callback<Guid, string, Guid, bool, CancellationToken>((_, reason, _, _, _) => capturedReason = reason)
                 .ReturnsAsync(ResultValue<bool>.Success(true));
 
             var handler = new CancelPaymentCommandHandler(repo.Object, NullLogger<CancelPaymentCommandHandler>.Instance);

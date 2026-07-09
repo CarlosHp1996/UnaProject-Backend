@@ -51,6 +51,29 @@ namespace UnaProject.Infra.Repositories
                     return result;
                 }
 
+                // IDOR: um usuário não-admin só pode criar pagamento para pedido PRÓPRIO.
+                // Retorna NotFound (não vaza existência do pedido de outro usuário).
+                if (!request.IsAdmin && order.UserId != request.UserId)
+                {
+                    _logger.LogWarning("User {UserId} attempted to create payment for order {OrderId} owned by {OwnerId}",
+                        request.UserId, order.Id, order.UserId);
+                    var result = new Result<CreateAbacatePaymentResponse>();
+                    result.WithNotFound("Order not found");
+                    return result;
+                }
+
+                // O valor cobrado é SEMPRE o total do pedido (fonte da verdade no servidor),
+                // nunca o valor enviado pelo cliente. Se o cliente mandar um Amount divergente, rejeita.
+                var authoritativeAmount = order.TotalAmount;
+                if (request.Amount > 0 && request.Amount != authoritativeAmount)
+                {
+                    _logger.LogWarning("Payment amount {RequestAmount} diverges from order total {OrderTotal} for order {OrderId}",
+                        request.Amount, authoritativeAmount, order.Id);
+                    var result = new Result<CreateAbacatePaymentResponse>();
+                    result.WithError("Payment amount does not match the order total.");
+                    return result;
+                }
+
                 IPaymentGateway gateway;
                 try
                 {
@@ -66,7 +89,7 @@ namespace UnaProject.Infra.Repositories
 
                 var gatewayRequest = new GatewayPaymentRequest
                 {
-                    Amount = request.Amount,
+                    Amount = authoritativeAmount,
                     Currency = "BRL",
                     OrderId = request.OrderId,
                     CustomerName = request.CustomerName,
@@ -100,7 +123,8 @@ namespace UnaProject.Infra.Repositories
                 {
                     Id = Guid.NewGuid(),
                     OrderId = request.OrderId,
-                    Amount = request.Amount,
+                    Amount = authoritativeAmount,
+                    Currency = "BRL",
                     Status = "pending",
                     PaymentMethod = request.PaymentMethod.ToLowerInvariant(),
                     TransactionId = gatewayPayment.ExternalId,
@@ -151,6 +175,8 @@ namespace UnaProject.Infra.Repositories
             decimal? fee,
             DateTime? paidAt,
             string metadata,
+            long? amountReceivedCents,
+            string? currency,
             CancellationToken cancellationToken)
         {
             try
@@ -171,6 +197,40 @@ namespace UnaProject.Infra.Repositories
                     return result;
                 }
 
+                var isPaid = status.Equals("paid", StringComparison.OrdinalIgnoreCase)
+                          || status.Equals("succeeded", StringComparison.OrdinalIgnoreCase);
+
+                // A-2: antes de marcar como PAGO, conferir valor recebido e moeda contra o esperado.
+                // Se divergir, NÃO marca pago — sinaliza para revisão manual e não libera o pedido.
+                if (isPaid)
+                {
+                    var expectedCents = (long)Math.Round(payment.Amount * 100m, MidpointRounding.AwayFromZero);
+                    var expectedCurrency = string.IsNullOrWhiteSpace(payment.Currency) ? "brl" : payment.Currency.ToLowerInvariant();
+                    var receivedCurrency = currency?.ToLowerInvariant();
+
+                    var amountMismatch = amountReceivedCents.HasValue && amountReceivedCents.Value != expectedCents;
+                    var currencyMismatch = !string.IsNullOrEmpty(receivedCurrency) && receivedCurrency != expectedCurrency;
+
+                    if (amountMismatch || currencyMismatch)
+                    {
+                        _logger.LogError(
+                            "Webhook amount/currency mismatch for Payment {PaymentId}. Expected {ExpectedCents} {ExpectedCurrency}, received {ReceivedCents} {ReceivedCurrency}. Marking for manual review; order NOT released.",
+                            payment.Id, expectedCents, expectedCurrency, amountReceivedCents, receivedCurrency);
+
+                        payment.Status = "review";
+                        payment.UpdatedAt = DateTime.UtcNow;
+                        payment.ErrorMessage = "Amount/currency mismatch on webhook - manual review required";
+                        if (!string.IsNullOrEmpty(metadata))
+                            payment.Metadata = metadata;
+
+                        await _context.SaveChangesAsync(cancellationToken);
+
+                        var mismatchResult = new ResultValue<bool>();
+                        mismatchResult.WithError("Webhook amount/currency mismatch - payment held for manual review");
+                        return mismatchResult;
+                    }
+                }
+
                 // Update payment data
                 payment.Status = status.ToLowerInvariant();
                 payment.UpdatedAt = DateTime.UtcNow;
@@ -185,7 +245,7 @@ namespace UnaProject.Infra.Repositories
                     payment.Metadata = metadata;
 
                 // Update order status if approved.
-                if (status.Equals("paid", StringComparison.OrdinalIgnoreCase))
+                if (isPaid)
                 {
                     var order = await _context.Orders
                         .FirstOrDefaultAsync(o => o.Id == payment.OrderId, cancellationToken);
@@ -218,6 +278,8 @@ namespace UnaProject.Infra.Repositories
         public async Task<ResultValue<bool>> CancelPayment(
             Guid paymentId,
             string reason,
+            Guid userId,
+            bool isAdmin,
             CancellationToken cancellationToken)
         {
             try
@@ -225,10 +287,20 @@ namespace UnaProject.Infra.Repositories
                 _logger.LogInformation("Cancelling payment: {PaymentId} - Reason: {Reason}", paymentId, reason);
 
                 var payment = await _context.Payments
+                    .Include(p => p.Order)
                     .FirstOrDefaultAsync(p => p.Id == paymentId, cancellationToken);
 
                 if (payment == null)
                 {
+                    var result = new ResultValue<bool>();
+                    result.WithNotFound("Payment not found");
+                    return result;
+                }
+
+                // IDOR: só o dono do pedido (ou Admin) pode cancelar. Não vaza existência.
+                if (!isAdmin && payment.Order?.UserId != userId)
+                {
+                    _logger.LogWarning("User {UserId} attempted to cancel payment {PaymentId} they do not own", userId, paymentId);
                     var result = new ResultValue<bool>();
                     result.WithNotFound("Payment not found");
                     return result;
@@ -306,6 +378,8 @@ namespace UnaProject.Infra.Repositories
 
         public async Task<Result<PaymentStatusDto>> GetPaymentStatus(
             Guid paymentId,
+            Guid userId,
+            bool isAdmin,
             CancellationToken cancellationToken)
         {
             try
@@ -313,11 +387,21 @@ namespace UnaProject.Infra.Repositories
                 _logger.LogInformation("Getting payment status for: {PaymentId}", paymentId);
 
                 var payment = await _context.Payments
+                    .Include(p => p.Order)
                     .FirstOrDefaultAsync(p => p.Id == paymentId, cancellationToken);
 
                 if (payment == null)
                 {
                     _logger.LogWarning("Payment not found: {PaymentId}", paymentId);
+                    var result = new Result<PaymentStatusDto>();
+                    result.WithNotFound("Payment not found");
+                    return result;
+                }
+
+                // IDOR: só o dono do pedido (ou Admin) pode consultar. Não vaza existência.
+                if (!isAdmin && payment.Order?.UserId != userId)
+                {
+                    _logger.LogWarning("User {UserId} attempted to read payment {PaymentId} they do not own", userId, paymentId);
                     var result = new Result<PaymentStatusDto>();
                     result.WithNotFound("Payment not found");
                     return result;

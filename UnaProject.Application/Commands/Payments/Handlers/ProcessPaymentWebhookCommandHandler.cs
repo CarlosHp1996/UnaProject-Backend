@@ -72,25 +72,33 @@ namespace UnaProject.Application.Commands.Payments.Handlers
                     return result;
                 }
 
-                // Validate signature if provided
-                if (!string.IsNullOrEmpty(request.Signature))
+                // M-1: fail-closed. Assinatura ausente/vazia => falha (nunca pula a validação).
+                if (string.IsNullOrEmpty(request.Signature))
                 {
-                    var signatureValidation = await gateway.ValidateWebhookSignatureAsync(
-                        request.WebhookPayload, request.Signature, request.WebhookSecret);
+                    var errorMsg = "Missing webhook signature";
+                    _logger.LogWarning("Webhook received without signature. EventId: {EventId}", webhookEventId);
+                    await _webhookRetryService.LogWebhookFailureAsync(webhookEventId, errorMsg);
 
-                    if (!signatureValidation.HasSuccess || signatureValidation.Value != true)
-                    {
-                        var errorMsg = "Invalid webhook signature";
-                        _logger.LogWarning(
-                            "Invalid webhook signature received. EventId: {EventId}",
-                            webhookEventId);
+                    var result = new ResultValue<bool>();
+                    result.WithError(errorMsg);
+                    return result;
+                }
 
-                        await _webhookRetryService.LogWebhookFailureAsync(webhookEventId, errorMsg);
+                var signatureValidation = await gateway.ValidateWebhookSignatureAsync(
+                    request.WebhookPayload, request.Signature, request.WebhookSecret);
 
-                        var result = new ResultValue<bool>();
-                        result.WithError(errorMsg);
-                        return result;
-                    }
+                if (!signatureValidation.HasSuccess || signatureValidation.Value != true)
+                {
+                    var errorMsg = "Invalid webhook signature";
+                    _logger.LogWarning(
+                        "Invalid webhook signature received. EventId: {EventId}",
+                        webhookEventId);
+
+                    await _webhookRetryService.LogWebhookFailureAsync(webhookEventId, errorMsg);
+
+                    var result = new ResultValue<bool>();
+                    result.WithError(errorMsg);
+                    return result;
                 }
 
                 // Parse (already-normalized) webhook event through the resolved gateway
@@ -125,13 +133,16 @@ namespace UnaProject.Application.Commands.Payments.Handlers
 
                 var paidAt = IsPaidStatus(webhookEvent.Status) ? DateTime.UtcNow : (DateTime?)null;
 
-                // Process webhook (repository procura o Payment por TransactionId OU BillingId)
+                // Process webhook (repository procura o Payment por TransactionId OU BillingId).
+                // A-2: repassa valor recebido (centavos) e moeda para conferência antes de liberar o pedido.
                 var processResult = await _paymentRepository.ProcessPaymentWebhook(
                     webhookEvent.ExternalId,
                     webhookEvent.Status,
                     null,
                     paidAt,
                     webhookEvent.RawPayload,
+                    webhookEvent.AmountReceivedCents,
+                    webhookEvent.Currency,
                     cancellationToken);
 
                 if (!processResult.HasSuccess)
@@ -181,13 +192,13 @@ namespace UnaProject.Application.Commands.Payments.Handlers
             }
             catch (Exception ex)
             {
-                var errorMsg = $"Internal error processing webhook: {ex.Message}";
+                // B-1: detalhe da exceção fica no log interno; a resposta ao cliente é genérica.
                 _logger.LogError(ex, "Error processing payment webhook. EventId: {EventId}", webhookEventId);
 
                 // Try to register failure in webhook if possible
                 try
                 {
-                    await _webhookRetryService.LogWebhookFailureAsync(webhookEventId, errorMsg);
+                    await _webhookRetryService.LogWebhookFailureAsync(webhookEventId, $"Internal error: {ex.Message}");
                 }
                 catch (Exception logEx)
                 {
@@ -195,7 +206,7 @@ namespace UnaProject.Application.Commands.Payments.Handlers
                 }
 
                 var result = new ResultValue<bool>();
-                result.WithError(errorMsg);
+                result.WithError("Internal error processing webhook");
                 return result;
             }
         }

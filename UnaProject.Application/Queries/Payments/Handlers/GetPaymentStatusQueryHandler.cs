@@ -25,7 +25,7 @@ namespace UnaProject.Application.Queries.Payments.Handlers
             {
                 _logger.LogInformation("Getting payment status for: {PaymentId}", request.PaymentId);
 
-                var result = await _paymentRepository.GetPaymentStatus(request.PaymentId, cancellationToken);
+                var result = await _paymentRepository.GetPaymentStatus(request.PaymentId, request.UserId, request.IsAdmin, cancellationToken);
 
                 if (!result.HasSuccess)
                 {

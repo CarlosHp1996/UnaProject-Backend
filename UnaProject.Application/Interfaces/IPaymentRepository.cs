@@ -19,15 +19,21 @@ namespace UnaProject.Application.Interfaces
             decimal? fee,
             DateTime? paidAt,
             string metadata,
+            long? amountReceivedCents,
+            string? currency,
             CancellationToken cancellationToken);
 
         Task<ResultValue<bool>> CancelPayment(
             Guid paymentId,
             string reason,
+            Guid userId,
+            bool isAdmin,
             CancellationToken cancellationToken);
 
         Task<Result<PaymentStatusDto>> GetPaymentStatus(
             Guid paymentId,
+            Guid userId,
+            bool isAdmin,
             CancellationToken cancellationToken);
 
         Task<Result<PaymentDto>> GetPaymentByBillingId(
