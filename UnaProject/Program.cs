@@ -440,10 +440,20 @@ using (var scope = app.Services.CreateScope())
 
         Console.WriteLine("Database connection established!");
 
-        // Apply migrations
-        Console.WriteLine("Applying migrations...");
-        await context.Database.MigrateAsync(cts.Token);
-        Console.WriteLine("Migrations applied successfully!");
+        // Auto-migrate no startup: perigoso em produção com múltiplas instâncias (concorrência).
+        // Controlado por Database:AutoMigrate (default = só em Development). Em produção, rodar
+        // `dotnet ef database update` no deploy em vez de migrar no boot.
+        var autoMigrate = builder.Configuration.GetValue<bool>("Database:AutoMigrate", app.Environment.IsDevelopment());
+        if (autoMigrate)
+        {
+            Console.WriteLine("Applying migrations...");
+            await context.Database.MigrateAsync(cts.Token);
+            Console.WriteLine("Migrations applied successfully!");
+        }
+        else
+        {
+            Console.WriteLine("Auto-migrate desativado (Database:AutoMigrate=false). Aplique as migrations manualmente no deploy.");
+        }
 
         // Seed data
         // await SeedData.Initialize(context);
