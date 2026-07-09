@@ -13,6 +13,7 @@ namespace UnaProject.Web.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Route("api/products")]
     public class ProductController : ControllerBase
     {
         private readonly IMediator _mediator;
@@ -44,6 +45,7 @@ namespace UnaProject.Web.Controllers
             Description = "Retrieve a specific product by ID.")]
         [SwaggerResponse(200, "Success", typeof(Result<GetProductByIdResponse>))]
         [HttpGet("get/{id}")]
+        [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)
         {
             var query = new GetProductByIdQuery(id);

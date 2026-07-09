@@ -1,4 +1,4 @@
-﻿using UnaProject.Application.Models.Filters;
+using UnaProject.Application.Models.Filters;
 using UnaProject.Application.Models.Requests.Orders;
 using UnaProject.Application.Models.Responses.Orders;
 using UnaProject.Domain.Entities;
@@ -17,5 +17,7 @@ namespace UnaProject.Application.Interfaces
         Task<UpdateOrderItemResponse> UpdateOrderItem(Guid orderId, Guid orderItemId, UpdateOrderItemRequest request, CancellationToken cancellationToken);
         Task<bool> DeleteOrder(Guid id, CancellationToken cancellationToken);
         Task<bool> DeleteOrderItem(Guid orderId, Guid orderItemId, CancellationToken cancellationToken);
+
+        Task<OrderStatisticsResponse> GetOrderStatistics(Guid? userId, CancellationToken cancellationToken);
     }
 }

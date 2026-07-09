@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using UnaProject.Application.Interfaces;
 using UnaProject.Application.Models.Dtos;
@@ -18,12 +18,16 @@ namespace UnaProject.Infra.Repositories
         private readonly AppDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IEmailService _emailService;
-
-        public UserRepository(AppDbContext context, UserManager<ApplicationUser> userManager, IEmailService emailService) : base(context)
+        private readonly IFileStorageService _fileStorageService;
+        private readonly IUrlHelperService _urlHelperService;
+ 
+        public UserRepository(AppDbContext context, UserManager<ApplicationUser> userManager, IEmailService emailService, IFileStorageService fileStorageService, IUrlHelperService urlHelperService) : base(context)
         {
             _context = context;
             _userManager = userManager;
             _emailService = emailService;
+            _fileStorageService = fileStorageService;
+            _urlHelperService = urlHelperService;
         }
 
         public async Task<CreateUserResponse> CreateUser(CreateUserRequest request, CancellationToken cancellationToken)
@@ -173,16 +177,37 @@ namespace UnaProject.Infra.Repositories
                 // Step 3: Update User Properties (apenas se não for recuperação de senha)
                 if (!request.IsPasswordRecovery)
                 {
-                    user.UserName = request.Name ?? user.UserName;
+                    // Handle Profile Picture Update (File or String)
+                    if (request.ProfilePictureFile != null)
+                    {
+                        var fileName = $"{user.Id}_avatar{Path.GetExtension(request.ProfilePictureFile.FileName)}";
+                        user.ProfilePicture = await _fileStorageService.UploadFileAsync(request.ProfilePictureFile, "avatars", fileName);
+                    }
+                    else if (!string.IsNullOrEmpty(request.ProfilePicture))
+                    {
+                        user.ProfilePicture = request.ProfilePicture;
+                    }
+
                     user.Email = request.Email?.ToLower().Trim() ?? user.Email;
                     user.PhoneNumber = request.PhoneNumber ?? user.PhoneNumber;
                     user.Cpf = request.Cpf ?? user.Cpf;
                     user.Gender = request.Gender ?? user.Gender;
 
+                    // Only update UserName if Name is provided and different
+                    if (!string.IsNullOrWhiteSpace(request.Name))
+                    {
+                        user.UserName = UserNameHelper.GenerateUserName(request.Name);
+                    }
+
                     // Step 4: Synchronize Addresses
                     if (request.Addresses != null)
                     {
-                        var addressesFromRequest = request.Addresses.ToDictionary(a => a.Id);
+                        // Fix for "Value cannot be null (Parameter 'key')" crash:
+                        // Only include addresses that have a valid ID. New addresses (Id == null or Guid.Empty) are handled separately.
+                        var addressesFromRequest = request.Addresses
+                            .Where(a => a.Id.HasValue && a.Id.Value != Guid.Empty)
+                            .ToDictionary(a => a.Id!.Value);
+
                         var addressesInDb = user.Addresses.ToList();
 
                         // Remove addresses that are in DB but not in the request
@@ -199,15 +224,15 @@ namespace UnaProject.Infra.Repositories
                                 // Add new address
                                 user.Addresses.Add(new Address
                                 {
-                                    Street = addressDto.Street,
-                                    CompletName = addressDto.CompletName,
-                                    City = addressDto.City,
-                                    State = (Domain.Enums.EnumState)addressDto.State,
-                                    ZipCode = addressDto.ZipCode,
-                                    Neighborhood = addressDto.Neighborhood,
-                                    Number = addressDto.Number,
+                                    Street = addressDto.Street ?? "Não informado",
+                                    CompletName = addressDto.CompletName ?? user.UserName ?? "Usuário",
+                                    City = addressDto.City ?? "Não informado",
+                                    State = (Domain.Enums.EnumState)(addressDto.State ?? Domain.Enums.EnumState.SP),
+                                    ZipCode = addressDto.ZipCode ?? "00000-000",
+                                    Neighborhood = addressDto.Neighborhood ?? "Não informado",
+                                    Number = addressDto.Number ?? "S/N",
                                     Complement = addressDto.Complement,
-                                    MainAddress = (bool)addressDto.MainAddress
+                                    MainAddress = addressDto.MainAddress ?? true
                                 });
                             }
                             else
@@ -216,23 +241,19 @@ namespace UnaProject.Infra.Repositories
                                 var existingAddress = user.Addresses.FirstOrDefault(a => a.Id == addressDto.Id);
                                 if (existingAddress != null)
                                 {
-                                    existingAddress.Street = addressDto.Street;
-                                    existingAddress.CompletName = addressDto.CompletName;
-                                    existingAddress.City = addressDto.City;
-                                    existingAddress.State = (Domain.Enums.EnumState)addressDto.State;
-                                    existingAddress.ZipCode = addressDto.ZipCode;
-                                    existingAddress.Neighborhood = addressDto.Neighborhood;
-                                    existingAddress.Number = addressDto.Number;
-                                    existingAddress.Complement = addressDto.Complement;
-                                    existingAddress.MainAddress = (bool)addressDto.MainAddress;
+                                    existingAddress.Street = addressDto.Street ?? existingAddress.Street;
+                                    existingAddress.CompletName = addressDto.CompletName ?? existingAddress.CompletName;
+                                    existingAddress.City = addressDto.City ?? existingAddress.City;
+                                    existingAddress.State = addressDto.State ?? existingAddress.State;
+                                    existingAddress.ZipCode = addressDto.ZipCode ?? existingAddress.ZipCode;
+                                    existingAddress.Neighborhood = addressDto.Neighborhood ?? existingAddress.Neighborhood;
+                                    existingAddress.Number = addressDto.Number ?? existingAddress.Number;
+                                    existingAddress.Complement = addressDto.Complement ?? existingAddress.Complement;
+                                    existingAddress.MainAddress = addressDto.MainAddress ?? existingAddress.MainAddress;
                                 }
                             }
                         }
                     }
-
-                    // Remove spaces from the name and generate a new UserName
-                    string userName = UserNameHelper.GenerateUserName(request.Name);
-                    user.UserName = userName;
 
                     // Step 5: Save User Changes (only if it's not a password recovery)
                     var updateResult = await _userManager.UpdateAsync(user);
@@ -259,6 +280,7 @@ namespace UnaProject.Infra.Repositories
                     PhoneNumber = user.PhoneNumber,
                     Cpf = user.Cpf,
                     Gender = user.Gender,
+                    ProfilePicture = !string.IsNullOrEmpty(user.ProfilePicture) ? _urlHelperService.GenerateImageUrl(user.ProfilePicture) : null,
                     Addresses = user.Addresses.Select(a => new AddressDto
                     {
                         Id = a.Id,

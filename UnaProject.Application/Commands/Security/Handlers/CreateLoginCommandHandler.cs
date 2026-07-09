@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.AspNetCore.Identity;
 using UnaProject.Application.Models.Responses.Security;
 using UnaProject.Domain.Entities.Security;
@@ -42,6 +42,7 @@ namespace UnaProject.Application.Commands.Security.Handlers
             {
                 Id = user.Id,
                 Name = user.UserName,
+                ProfilePicture = user.ProfilePicture,
                 Token = await _accessManager.GenerateToken(user), //Generate token
                 Mensage = "Login successfully."
             };

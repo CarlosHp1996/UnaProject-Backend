@@ -77,12 +77,29 @@ namespace UnaProject.Web.Controllers
         [SwaggerResponse(200, "Success", typeof(Result<UpdateUserResponse>))]
         [HttpPut("update")]
         [Authorize(Roles = "User,Admin")]
-        public async Task<IActionResult> Update(Guid? id, [FromBody] UpdateUserRequest request)
+        public async Task<IActionResult> Update([FromBody] UpdateUserRequest request)
         {
-            if (id == null || id == Guid.Empty)
+            if (request.Id == null || request.Id == Guid.Empty)
                 request.IsPasswordRecovery = true;            
 
-            var command = new UpdateUserCommand(id ?? Guid.Empty, request);
+            var command = new UpdateUserCommand(request.Id ?? Guid.Empty, request);
+            var result = await _mediator.Send(command);
+
+            if (result.HasSuccess)
+                return Ok(result);
+
+            return BadRequest(result.Errors);
+        }
+
+        [SwaggerOperation(
+            Summary = "Upload User Avatar",
+            Description = "Upload a profile picture for the user.")]
+        [SwaggerResponse(200, "Success", typeof(Result<string>))]
+        [HttpPost("upload-avatar")]
+        [Authorize(Roles = "User,Admin")]
+        public async Task<IActionResult> UploadAvatar(IFormFile file)
+        {
+            var command = new UploadAvatarCommand(file);
             var result = await _mediator.Send(command);
 
             if (result.HasSuccess)

@@ -1,19 +1,19 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
 using UnaProject.Application.Interfaces;
+using UnaProject.Application.Models.Dtos.Gateway;
 using UnaProject.Application.Services.Interfaces;
 using UnaProject.Domain.Helpers;
-using System.Text.Json;
-using UnaProject.Application.Models.Dtos;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace UnaProject.Application.Commands.Payments.Handlers
 {
     public class ProcessPaymentWebhookCommandHandler : IRequestHandler<ProcessPaymentWebhookCommand, ResultValue<bool>>
     {
         private readonly IPaymentRepository _paymentRepository;
-        private readonly IAbacatePayService _abacatePayService;
+        private readonly IPaymentGatewayResolver _paymentGatewayResolver;
         private readonly IAuditService _auditService;
         private readonly IWebhookRetryService _webhookRetryService;
         private readonly IPaymentNotificationService _notificationService;
@@ -21,14 +21,14 @@ namespace UnaProject.Application.Commands.Payments.Handlers
 
         public ProcessPaymentWebhookCommandHandler(
             IPaymentRepository paymentRepository,
-            IAbacatePayService abacatePayService,
+            IPaymentGatewayResolver paymentGatewayResolver,
             IAuditService auditService,
             IWebhookRetryService webhookRetryService,
             IPaymentNotificationService notificationService,
             ILogger<ProcessPaymentWebhookCommandHandler> logger)
         {
             _paymentRepository = paymentRepository;
-            _abacatePayService = abacatePayService;
+            _paymentGatewayResolver = paymentGatewayResolver;
             _auditService = auditService;
             _webhookRetryService = webhookRetryService;
             _notificationService = notificationService;
@@ -43,8 +43,8 @@ namespace UnaProject.Application.Commands.Payments.Handlers
             try
             {
                 _logger.LogInformation(
-                    "Processing payment webhook. EventId: {EventId}, PayloadHash: {PayloadHash}",
-                    webhookEventId, payloadHash);
+                    "Processing payment webhook. Provider: {Provider}, EventId: {EventId}, PayloadHash: {PayloadHash}",
+                    request.Provider, webhookEventId, payloadHash);
 
                 // Check idempotency
                 var idempotencyCheck = await _webhookRetryService.IsWebhookProcessedAsync(webhookEventId, payloadHash);
@@ -56,11 +56,27 @@ namespace UnaProject.Application.Commands.Payments.Handlers
                     return ResultValue<bool>.Success(true);
                 }
 
-                // Validate signature if provided
-                if (!string.IsNullOrEmpty(request.Signature) && !string.IsNullOrEmpty(request.WebhookSecret))
+                IPaymentGateway gateway;
+                try
                 {
-                    var signatureValidation = await _abacatePayService.ValidateWebhookSignatureAsync(
-                        request.WebhookPayload, request.Signature);
+                    gateway = _paymentGatewayResolver.ResolveByProvider(request.Provider);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    var errorMsg = $"Unknown payment provider: {request.Provider}";
+                    _logger.LogWarning(ex, errorMsg);
+                    await _webhookRetryService.LogWebhookFailureAsync(webhookEventId, errorMsg);
+
+                    var result = new ResultValue<bool>();
+                    result.WithError(errorMsg);
+                    return result;
+                }
+
+                // Validate signature if provided
+                if (!string.IsNullOrEmpty(request.Signature))
+                {
+                    var signatureValidation = await gateway.ValidateWebhookSignatureAsync(
+                        request.WebhookPayload, request.Signature, request.WebhookSecret);
 
                     if (!signatureValidation.HasSuccess || signatureValidation.Value != true)
                     {
@@ -77,44 +93,28 @@ namespace UnaProject.Application.Commands.Payments.Handlers
                     }
                 }
 
-                // Deserialize payload
-                WebhookEventDto? webhookEvent;
-                try
+                // Parse (already-normalized) webhook event through the resolved gateway
+                var parseResult = await gateway.ParseWebhookEventAsync(request.WebhookPayload);
+                if (!parseResult.HasSuccess || parseResult.Value == null)
                 {
-                    webhookEvent = JsonSerializer.Deserialize<WebhookEventDto>(request.WebhookPayload, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
-
-                    if (webhookEvent == null || webhookEvent.Data == null)
-                    {
-                        var errorMsg = "Invalid webhook payload";
-                        await _webhookRetryService.LogWebhookFailureAsync(webhookEventId, errorMsg);
-
-                        var result = new ResultValue<bool>();
-                        result.WithError(errorMsg);
-                        return result;
-                    }
-                }
-                catch (JsonException ex)
-                {
-                    var errorMsg = $"Error processing webhook payload: {ex.Message}";
-                    _logger.LogError(ex, "Failed to deserialize webhook payload");
+                    var errorMsg = "Invalid webhook payload";
                     await _webhookRetryService.LogWebhookFailureAsync(webhookEventId, errorMsg);
 
                     var result = new ResultValue<bool>();
-                    result.WithError("Error processing webhook payload");
+                    result.WithError(errorMsg);
                     return result;
                 }
 
-                _logger.LogInformation("Processing webhook event: {EventType} for billing: {BillingId}",
-                    webhookEvent.Event, webhookEvent.Data.BillingId);
+                var webhookEvent = parseResult.Value;
+
+                _logger.LogInformation("Processing webhook event: {EventType} for external id: {ExternalId}",
+                    webhookEvent.EventType, webhookEvent.ExternalId);
 
                 // Register webhook attempt
                 var attemptResult = await _webhookRetryService.LogWebhookAttemptAsync(
                     Guid.Empty, // Will be updated when we find the payment
                     webhookEventId,
-                    webhookEvent.Event ?? "unknown",
+                    webhookEvent.EventType,
                     request.WebhookPayload,
                     payloadHash);
 
@@ -123,13 +123,15 @@ namespace UnaProject.Application.Commands.Payments.Handlers
                     _logger.LogWarning("Failed to log webhook attempt: {Error}", attemptResult.ErrorMessage);
                 }
 
-                // Process webhook
+                var paidAt = IsPaidStatus(webhookEvent.Status) ? DateTime.UtcNow : (DateTime?)null;
+
+                // Process webhook (repository procura o Payment por TransactionId OU BillingId)
                 var processResult = await _paymentRepository.ProcessPaymentWebhook(
-                    webhookEvent.Data.BillingId ?? "",
-                    webhookEvent.Data.Status ?? "",
-                    webhookEvent.Data.PlatformFee,
-                    webhookEvent.Data.PaidAt,
-                    webhookEvent.Data.Metadata ?? "",
+                    webhookEvent.ExternalId,
+                    webhookEvent.Status,
+                    null,
+                    paidAt,
+                    webhookEvent.RawPayload,
                     cancellationToken);
 
                 if (!processResult.HasSuccess)
@@ -143,12 +145,12 @@ namespace UnaProject.Application.Commands.Payments.Handlers
                     return result;
                 }
 
-                // Get the payment by billing ID to access payment details
-                var payment = await GetPaymentByBillingId(webhookEvent.Data.BillingId ?? "");
+                // Get the payment by external id to access payment details
+                var payment = await GetPaymentByExternalId(webhookEvent.ExternalId);
                 if (payment == null)
                 {
                     var errorMsg = "Payment not found after processing webhook";
-                    _logger.LogWarning("Payment not found for BillingId: {BillingId}", webhookEvent.Data.BillingId);
+                    _logger.LogWarning("Payment not found for ExternalId: {ExternalId}", webhookEvent.ExternalId);
                     await _webhookRetryService.LogWebhookFailureAsync(webhookEventId, errorMsg);
 
                     var result = new ResultValue<bool>();
@@ -159,7 +161,7 @@ namespace UnaProject.Application.Commands.Payments.Handlers
                 // Register audit log
                 await _auditService.LogWebhookReceivedAsync(
                     payment.Id,
-                    webhookEvent.Event ?? "unknown",
+                    webhookEvent.EventType,
                     payloadHash,
                     webhookEvent,
                     request.IPAddress);
@@ -170,10 +172,10 @@ namespace UnaProject.Application.Commands.Payments.Handlers
                     $"Webhook processed successfully for payment {payment.Id}");
 
                 // Send notifications based on status
-                await SendNotificationBasedOnStatus(payment, webhookEvent.Event ?? "");
+                await SendNotificationBasedOnStatus(payment, webhookEvent.EventType);
 
                 _logger.LogInformation("Webhook processed successfully. PaymentId: {PaymentId}, Event: {Event}",
-                    payment.Id, webhookEvent.Event);
+                    payment.Id, webhookEvent.EventType);
 
                 return processResult;
             }
@@ -198,6 +200,10 @@ namespace UnaProject.Application.Commands.Payments.Handlers
             }
         }
 
+        private static bool IsPaidStatus(string status) =>
+            status.Equals("succeeded", StringComparison.OrdinalIgnoreCase) ||
+            status.Equals("paid", StringComparison.OrdinalIgnoreCase);
+
         private async Task SendNotificationBasedOnStatus(Domain.Entities.Payment payment, string eventType)
         {
             try
@@ -211,17 +217,20 @@ namespace UnaProject.Application.Commands.Payments.Handlers
                 switch (eventType.ToLower())
                 {
                     case "billing.paid":
+                    case "payment_intent.succeeded":
                         await _notificationService.SendPaymentConfirmedNotificationAsync(
                             payment.Id, payment.CustomerEmail);
                         break;
 
                     case "billing.failed":
+                    case "payment_intent.payment_failed":
                         // Notify admin about failure
                         await _notificationService.SendPaymentFailedAdminNotificationAsync(
                             payment.Id, $"Payment failed via webhook: {eventType}");
                         break;
 
                     case "billing.cancelled":
+                    case "payment_intent.canceled":
                         await _notificationService.SendPaymentCancelledNotificationAsync(
                             payment.Id, payment.CustomerEmail);
                         break;
@@ -246,18 +255,18 @@ namespace UnaProject.Application.Commands.Payments.Handlers
             }
         }
 
-        private async Task<Domain.Entities.Payment?> GetPaymentByBillingId(string billingId)
+        private async Task<Domain.Entities.Payment?> GetPaymentByExternalId(string externalId)
         {
             try
             {
-                // Get all payments and find by billing ID
+                // Get all payments and find by TransactionId (Stripe) or BillingId (AbacatePay legado)
                 var allPayments = await _paymentRepository.GetAll(null, null, "Id", true);
                 var payments = allPayments.Result(out var totalCount);
-                return payments?.FirstOrDefault(p => p.BillingId == billingId);
+                return payments?.FirstOrDefault(p => p.TransactionId == externalId || p.BillingId == externalId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting payment by billing ID: {BillingId}", billingId);
+                _logger.LogError(ex, "Error getting payment by external id: {ExternalId}", externalId);
                 return null;
             }
         }

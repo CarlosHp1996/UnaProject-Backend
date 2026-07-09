@@ -175,8 +175,9 @@ builder.Services.AddScoped<ISocialAuthService, SocialAuthService>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddHttpClient();
 
-// AbacatePay Configuration
-builder.Services.AddAbacatePay(builder.Configuration);
+// AbacatePay Configuration — DESATIVADO na migração para Stripe (mantido no código por
+// reversibilidade; ver UnaProject.Application/Extensions/AbacatePayServiceExtensions.cs).
+// builder.Services.AddAbacatePay(builder.Configuration);
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IWebhookRetryService, WebhookRetryService>();
 builder.Services.AddScoped<IPaymentNotificationService, PaymentNotificationService>();
@@ -201,20 +202,41 @@ if (enableWebhookRetryBackground)
     builder.Services.AddHostedService<WebhookRetryBackgroundService>();
 }
 
-//PRODUCTION
-// File Storage Service
-//builder.Services.AddScoped<IFileStorageService>(provider =>
-//    new FileStorageService("/app/ImagensBackend"));
-//DEVELOPMENT
+// File Storage Service — caminho vem da configuração (FileStorage:LocalImagesPath);
+// fallback para uma pasta "ImagensBackend" ao lado do ContentRoot.
+var imagesPath = builder.Configuration["FileStorage:LocalImagesPath"];
+if (string.IsNullOrWhiteSpace(imagesPath))
+    imagesPath = Path.Combine(builder.Environment.ContentRootPath, "ImagensBackend");
+Directory.CreateDirectory(imagesPath);
 builder.Services.AddScoped<IFileStorageService>(provider =>
-    new FileStorageService(
-        @"C:\Users\Carlos Henrique\Desktop\DESKTOP\PROJETOS\una-estudio-criativo\ImagensBackend"
-    ));
+    new FileStorageService(imagesPath));
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUrlHelperService, UrlHelperService>();
 //builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 //builder.Services.AddStripeServices(builder.Configuration);
+
+// ===== STRIPE CONFIGURATION (gateway ativo de pagamentos) =====
+builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
+builder.Services.AddScoped<StripeGateway>();
+builder.Services.AddScoped<IPaymentGatewayResolver>(sp =>
+{
+    var stripeGateway = sp.GetRequiredService<StripeGateway>();
+
+    var methodMap = new Dictionary<string, IPaymentGateway>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["card"] = stripeGateway,
+        ["pix"] = stripeGateway
+    };
+
+    var providerMap = new Dictionary<string, IPaymentGateway>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["stripe"] = stripeGateway
+    };
+
+    return new PaymentGatewayResolver(methodMap, providerMap);
+});
+// ===== END STRIPE CONFIGURATION =====
 
 // CORS Configuration
 builder.Services.AddCors(options =>
@@ -261,9 +283,11 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
 // ===== FIM IDENTITY =====
 
 // ===== JWT CONFIGURATION =====
-var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY") ??
-             builder.Configuration["Jwt:Key"] ??
-             throw new InvalidOperationException("JWT_KEY environment variable is required");
+var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
+if (string.IsNullOrWhiteSpace(jwtKey))
+    jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+    throw new InvalidOperationException("Chave JWT não configurada (defina a variável de ambiente JWT_KEY ou a seção Jwt:Key).");
 
 var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ??
                 builder.Configuration["Jwt:Issuer"] ??
@@ -469,12 +493,14 @@ using (var scope = app.Services.CreateScope())
 }
 // ===== END MIGRATIONS =====
 
-// ===== USER SEED =====
-using (var scope = app.Services.CreateScope())
+// ===== USER SEED (apenas em Development e se habilitado em SeedData:Enabled) =====
+var seedEnabled = builder.Configuration.GetValue<bool>("SeedData:Enabled", app.Environment.IsDevelopment());
+if (app.Environment.IsDevelopment() && seedEnabled)
 {
+    using var scope = app.Services.CreateScope();
     try
     {
-        Console.WriteLine("Inicializando usuários do sistema...");
+        Console.WriteLine("Inicializando usuários do sistema (seed de desenvolvimento)...");
 
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
@@ -490,91 +516,44 @@ using (var scope = app.Services.CreateScope())
             }
         }
 
-        // Create user Admin Carlos
-        var adminUser = await userManager.FindByEmailAsync("carloshpsantos1996@gmail.com");
-        if (adminUser == null)
+        // Admins vêm da configuração (SeedData:Admins) — nunca hardcoded no código.
+        var seedAdmins = builder.Configuration.GetSection("SeedData:Admins").Get<List<SeedAdmin>>() ?? new List<SeedAdmin>();
+        foreach (var admin in seedAdmins)
         {
-            adminUser = new ApplicationUser
+            if (string.IsNullOrWhiteSpace(admin.Email) || string.IsNullOrWhiteSpace(admin.Password))
+                continue;
+
+            var existing = await userManager.FindByEmailAsync(admin.Email);
+            if (existing != null)
             {
-                UserName = "CarlosAdmin",
-                Email = "carloshpsantos1996@gmail.com",
+                Console.WriteLine($"Admin {admin.Email} já existe.");
+                continue;
+            }
+
+            var newAdmin = new ApplicationUser
+            {
+                UserName = string.IsNullOrWhiteSpace(admin.UserName) ? admin.Email : admin.UserName,
+                Email = admin.Email,
                 EmailConfirmed = true
             };
 
-            var result = await userManager.CreateAsync(adminUser, "@Caique123");
+            var result = await userManager.CreateAsync(newAdmin, admin.Password);
             if (result.Succeeded)
             {
-                await userManager.AddToRoleAsync(adminUser, "Admin");
-                Console.WriteLine("Admin Carlos created!");
-            }
-        }
-
-        // Create user Admin Geisa
-        var adminUserGeisa = await userManager.FindByEmailAsync("geisaferoli@gmail.com");
-        if (adminUserGeisa == null)
-        {
-            adminUserGeisa = new ApplicationUser
-            {
-                UserName = "GeisaAdmin",
-                Email = "geisaferoli@gmail.com",
-                EmailConfirmed = true
-            };
-
-            var resultGeisa = await userManager.CreateAsync(adminUserGeisa, "@Geisa123");
-            if (resultGeisa.Succeeded)
-            {
-                await userManager.AddToRoleAsync(adminUserGeisa, "Admin");
-                Console.WriteLine("User Admin Geisa created successfully!");
+                await userManager.AddToRoleAsync(newAdmin, "Admin");
+                Console.WriteLine($"Admin {admin.Email} criado!");
             }
             else
             {
-                Console.WriteLine($"Error creating user Admin Geisa: {string.Join(", ", resultGeisa.Errors.Select(e => e.Description))}");
-            }
-        }
-        else
-        {
-            Console.WriteLine("User Admin Geisa already exists.");
-        }
-
-        // Create additional Admin users for testing
-        for (int i = 1; i <= 5; i++)
-        {
-            string userName = $"admin{i}";
-            string email = $"admin{i}@gmail.com";
-            string password = $"@Admin{i}";
-
-            var existingUser = await userManager.FindByEmailAsync(email);
-            if (existingUser == null)
-            {
-                var newAdmin = new ApplicationUser
-                {
-                    UserName = userName,
-                    Email = email,
-                    EmailConfirmed = true
-                };
-
-                var createResult = await userManager.CreateAsync(newAdmin, password);
-                if (createResult.Succeeded)
-                {
-                    await userManager.AddToRoleAsync(newAdmin, "Admin");
-                    Console.WriteLine($"User {userName} created successfully!");
-                }
-                else
-                {
-                    Console.WriteLine($"Error creating {userName}: {string.Join(", ", createResult.Errors.Select(e => e.Description))}");
-                }
-            }
-            else
-            {
-                Console.WriteLine($"ℹUser {userName} already exists.");
+                Console.WriteLine($"Erro ao criar admin {admin.Email}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
             }
         }
 
-        Console.WriteLine("Users initialized!");
+        Console.WriteLine("Seed de usuários concluído!");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Error creating users: {ex.Message}");
+        Console.WriteLine($"Erro no seed de usuários: {ex.Message}");
     }
 }
 // ===== END SEED =====
@@ -588,11 +567,9 @@ using (var scope = app.Services.CreateScope())
 //     RequestPath = "/imagens"
 // });
 
-//DEVELOPMENT
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(
-       @"C:\Users\Carlos Henrique\Desktop\DESKTOP\PROJETOS\una-estudio-criativo\ImagensBackend"),
+    FileProvider = new PhysicalFileProvider(imagesPath),
     RequestPath = ""
 });
 
@@ -624,6 +601,14 @@ Console.WriteLine("Application started successfully!");
 Console.WriteLine($"Swagger available at: /swagger");
 
 app.Run();
+
+// Modelo usado para ler os administradores de seed da configuração (SeedData:Admins).
+public class SeedAdmin
+{
+    public string? UserName { get; set; }
+    public string? Email { get; set; }
+    public string? Password { get; set; }
+}
 
 // public static class SeedData
 // {

@@ -1,7 +1,9 @@
 using UnaProject.Application.Models.Dtos;
 using UnaProject.Application.Models.Requests.Payments;
+using UnaProject.Application.Models.Responses.Payments;
 using UnaProject.Domain.Entities;
 using UnaProject.Domain.Helpers;
+using CreateAbacatePaymentResponse = UnaProject.Application.Models.Dtos.CreateAbacatePaymentResponse;
 
 namespace UnaProject.Application.Interfaces
 {
@@ -35,5 +37,7 @@ namespace UnaProject.Application.Interfaces
         Task<Result<List<PaymentDto>>> GetPaymentsByOrder(
             Guid orderId,
             CancellationToken cancellationToken);
+
+        Task<PaymentStatisticsResponse> GetPaymentStatistics(Guid? userId, CancellationToken cancellationToken);
     }
 }

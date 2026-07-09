@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using UnaProject.Application.Interfaces;
 using UnaProject.Application.Models.Dtos;
 using UnaProject.Application.Models.Responses.Security;
@@ -40,6 +40,7 @@ namespace UnaProject.Application.Queries.Security.Handlers
                         PhoneNumber = user.PhoneNumber,
                         Cpf = user.Cpf,
                         Gender = user.Gender,
+                        ProfilePicture = user.ProfilePicture,
                         Addresses = user.Addresses?.Select(a => new AddressDto
                         {
                             Id = a.Id,

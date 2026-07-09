@@ -4,7 +4,7 @@ using UnaProject.Domain.Helpers;
 
 namespace UnaProject.Application.Commands.Payments
 {
-    public record CreateAbacatePaymentCommand(
+    public record CreatePaymentCommand(
         Guid OrderId,
         decimal Amount,
         string PaymentMethod,

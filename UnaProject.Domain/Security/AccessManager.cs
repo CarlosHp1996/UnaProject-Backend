@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.Collections.Concurrent;
@@ -33,10 +33,11 @@ namespace UnaProject.Domain.Security
             // Create the claims, including the roles.
             var claims = new List<Claim>
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim("id", user.Id.ToString()),
-                new Claim("name", user.UserName)
+                new Claim("name", user.UserName),
+                new Claim("profilePicture", user.ProfilePicture ?? "")
             };
 
             // Add each role as a claim.
@@ -45,7 +46,15 @@ namespace UnaProject.Domain.Security
                 claims.Add(new Claim(ClaimTypes.Role, role));
             }
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT_KEY"]));
+            // Resolve a chave da mesma forma que o Program.cs valida o token:
+            // a variável de ambiente JWT_KEY tem prioridade, depois a seção Jwt:Key.
+            var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
+            if (string.IsNullOrWhiteSpace(jwtKey))
+                jwtKey = _configuration["Jwt:Key"];
+            if (string.IsNullOrWhiteSpace(jwtKey))
+                throw new InvalidOperationException("Chave JWT não configurada (defina a variável de ambiente JWT_KEY ou a seção Jwt:Key).");
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(

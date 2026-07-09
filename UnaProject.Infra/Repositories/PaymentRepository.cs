@@ -1,13 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using UnaProject.Application.Interfaces;
 using UnaProject.Application.Models.Dtos;
-using UnaProject.Application.Services.Interfaces;
+using UnaProject.Application.Models.Dtos.Gateway;
 using UnaProject.Domain.Entities;
 using UnaProject.Domain.Enums;
 using UnaProject.Domain.Helpers;
 using UnaProject.Infra.Data;
 using Microsoft.Extensions.Logging;
 using UnaProject.Application.Models.Requests.Payments;
+using UnaProject.Application.Models.Responses.Payments;
 using CreateAbacatePaymentResponse = UnaProject.Application.Models.Dtos.CreateAbacatePaymentResponse;
 
 namespace UnaProject.Infra.Repositories
@@ -15,16 +16,16 @@ namespace UnaProject.Infra.Repositories
     public class PaymentRepository : BaseRepository<Payment>, IPaymentRepository
     {
         private readonly AppDbContext _context;
-        private readonly IAbacatePayService _abacatePayService;
+        private readonly IPaymentGatewayResolver _paymentGatewayResolver;
         private readonly ILogger<PaymentRepository> _logger;
 
         public PaymentRepository(
             AppDbContext context,
-            IAbacatePayService abacatePayService,
+            IPaymentGatewayResolver paymentGatewayResolver,
             ILogger<PaymentRepository> logger) : base(context)
         {
             _context = context;
-            _abacatePayService = abacatePayService;
+            _paymentGatewayResolver = paymentGatewayResolver;
             _logger = logger;
         }
 
@@ -34,7 +35,8 @@ namespace UnaProject.Infra.Repositories
         {
             try
             {
-                _logger.LogInformation("Creating AbacatePay payment for order: {OrderId}", request.OrderId);
+                _logger.LogInformation("Creating payment for order: {OrderId} via method {PaymentMethod}",
+                    request.OrderId, request.PaymentMethod);
 
                 // Validar pedido existe
                 var order = await _context.Orders
@@ -49,41 +51,51 @@ namespace UnaProject.Infra.Repositories
                     return result;
                 }
 
-                // Create billing in AbacatePay
-                var billingRequest = new CreateBillingRequest
+                IPaymentGateway gateway;
+                try
                 {
-                    Amount = request.Amount,
-                    Methods = [request.PaymentMethod.ToLowerInvariant()],
-                    Customer = new CustomerRequest
-                    {
-                        Name = request.CustomerName,
-                        Document = request.CustomerDocument,
-                        Email = request.CustomerEmail,
-                        Phone = request.CustomerPhone
-                    },
-                    Products = order.OrderItems.Select(item => new ProductRequest
-                    {
-                        Name = item.Product?.Name ?? "Product",
-                        Quantity = item.Quantity,
-                        Price = item.UnitPrice
-                    }).ToList(),
-                    ReturnUrl = request.ReturnUrl,
-                    Metadata = request.Metadata
-                };
-
-                var billingResult = await _abacatePayService.CreateBillingAsync(billingRequest);
-
-                if (!billingResult.HasSuccess)
+                    gateway = _paymentGatewayResolver.Resolve(request.PaymentMethod);
+                }
+                catch (InvalidOperationException ex)
                 {
-                    _logger.LogError("Failed to create billing: {Error}", billingResult.ErrorMessage);
+                    _logger.LogError(ex, "No gateway configured for payment method: {PaymentMethod}", request.PaymentMethod);
                     var result = new Result<CreateAbacatePaymentResponse>();
-                    result.WithError($"Error creating billing: {billingResult.ErrorMessage}");
+                    result.WithError(ex.Message);
                     return result;
                 }
 
-                var billing = billingResult.Value!;
+                var gatewayRequest = new GatewayPaymentRequest
+                {
+                    Amount = request.Amount,
+                    Currency = "BRL",
+                    OrderId = request.OrderId,
+                    CustomerName = request.CustomerName,
+                    CustomerEmail = request.CustomerEmail,
+                    CustomerDocument = request.CustomerDocument,
+                    CustomerPhone = request.CustomerPhone,
+                    PaymentMethod = request.PaymentMethod.ToLowerInvariant(),
+                    ReturnUrl = request.ReturnUrl,
+                    Metadata = string.IsNullOrEmpty(request.Metadata)
+                        ? null
+                        : new Dictionary<string, string> { ["info"] = request.Metadata }
+                };
 
-                // Criar pagamento local
+                var gatewayResult = await gateway.CreatePaymentAsync(gatewayRequest, cancellationToken);
+
+                if (!gatewayResult.HasSuccess || gatewayResult.Value == null)
+                {
+                    _logger.LogError("Failed to create payment via {Provider}: {Error}",
+                        gateway.ProviderName, gatewayResult.ErrorMessage);
+                    var result = new Result<CreateAbacatePaymentResponse>();
+                    result.WithError($"Error creating payment: {gatewayResult.ErrorMessage}");
+                    return result;
+                }
+
+                var gatewayPayment = gatewayResult.Value;
+
+                // Criar pagamento local. BillingId é preenchido com o ExternalId do gateway
+                // para manter compatibilidade com as consultas existentes por BillingId
+                // (ex.: GET api/payment/billing/{billingId}).
                 var payment = new Payment
                 {
                     Id = Guid.NewGuid(),
@@ -91,43 +103,42 @@ namespace UnaProject.Infra.Repositories
                     Amount = request.Amount,
                     Status = "pending",
                     PaymentMethod = request.PaymentMethod.ToLowerInvariant(),
-                    BillingId = billing.Id,
-                    PaymentUrl = billing.Url,
-                    QrCode = billing.QrCode,
-                    QrCodeImage = billing.QrCodeImage,
-                    ExpiresAt = billing.ExpiresAt,
+                    TransactionId = gatewayPayment.ExternalId,
+                    ClientSecret = gatewayPayment.ClientSecret,
+                    BillingId = gatewayPayment.ExternalId,
+                    PaymentUrl = gatewayPayment.PaymentUrl,
+                    QrCode = gatewayPayment.QrCode,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
-                    DevMode = billing.DevMode,
-                    AbacateStatus = billing.Status,
+                    AbacateStatus = gatewayPayment.Status,
                     AbacateMethod = request.PaymentMethod,
-                    Metadata = request.Metadata
+                    Metadata = request.Metadata,
+                    CustomerEmail = request.CustomerEmail
                 };
 
                 _context.Payments.Add(payment);
                 await _context.SaveChangesAsync(cancellationToken);
 
-                _logger.LogInformation("Payment created successfully: {PaymentId} - BillingId: {BillingId}",
-                    payment.Id, billing.Id);
+                _logger.LogInformation("Payment created successfully: {PaymentId} - Provider: {Provider} - ExternalId: {ExternalId}",
+                    payment.Id, gateway.ProviderName, gatewayPayment.ExternalId);
 
                 var response = new CreateAbacatePaymentResponse
                 {
                     PaymentId = payment.Id,
-                    BillingId = billing.Id,
-                    PaymentUrl = billing.Url,
-                    QrCode = billing.QrCode,
-                    QrCodeImage = billing.QrCodeImage,
+                    BillingId = gatewayPayment.ExternalId,
+                    PaymentUrl = gatewayPayment.PaymentUrl,
+                    QrCode = gatewayPayment.QrCode,
+                    ClientSecret = gatewayPayment.ClientSecret,
                     Status = payment.Status,
-                    ExpiresAt = billing.ExpiresAt,
                     Amount = payment.Amount,
-                    DevMode = payment.DevMode ?? false
+                    DevMode = false
                 };
 
                 return Result<CreateAbacatePaymentResponse>.Success(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating AbacatePay payment for order: {OrderId}", request.OrderId);
+                _logger.LogError(ex, "Error creating payment for order: {OrderId}", request.OrderId);
                 var result = new Result<CreateAbacatePaymentResponse>();
                 result.WithException("Internal error creating payment");
                 return result;
@@ -144,15 +155,17 @@ namespace UnaProject.Infra.Repositories
         {
             try
             {
-                _logger.LogInformation("Processing payment webhook for BillingId: {BillingId} - Status: {Status}",
+                _logger.LogInformation("Processing payment webhook for ExternalId: {BillingId} - Status: {Status}",
                     billingId, status);
 
+                // billingId aqui é o identificador externo genérico (BillingId do AbacatePay
+                // ou TransactionId/PaymentIntent.Id do Stripe) — buscamos por ambos os campos.
                 var payment = await _context.Payments
-                    .FirstOrDefaultAsync(p => p.BillingId == billingId, cancellationToken);
+                    .FirstOrDefaultAsync(p => p.TransactionId == billingId || p.BillingId == billingId, cancellationToken);
 
                 if (payment == null)
                 {
-                    _logger.LogWarning("Payment not found for webhook BillingId: {BillingId}", billingId);
+                    _logger.LogWarning("Payment not found for webhook ExternalId: {BillingId}", billingId);
                     var result = new ResultValue<bool>();
                     result.WithNotFound("Payment not found");
                     return result;
@@ -233,21 +246,31 @@ namespace UnaProject.Infra.Repositories
                     return result;
                 }
 
-                // Cancel on AbacatePay if BillingId exists
+                // Cancel on the payment gateway if an external id exists
                 bool cancelledOnGateway = false;
-                if (!string.IsNullOrEmpty(payment.BillingId))
+                var externalId = !string.IsNullOrEmpty(payment.TransactionId) ? payment.TransactionId : payment.BillingId;
+                if (!string.IsNullOrEmpty(externalId))
                 {
-                    var cancelResult = await _abacatePayService.CancelBillingAsync(payment.BillingId);
+                    try
+                    {
+                        var gateway = _paymentGatewayResolver.Resolve(payment.PaymentMethod);
+                        var cancelResult = await gateway.CancelAsync(externalId, reason, cancellationToken);
 
-                    if (!cancelResult.HasSuccess)
-                    {
-                        _logger.LogError("Failed to cancel billing on AbacatePay: {BillingId} - {Error}",
-                            payment.BillingId, cancelResult.ErrorMessage);
-                        payment.ErrorMessage = $"Cancel on gateway failed: {cancelResult.ErrorMessage}";
+                        if (!cancelResult.HasSuccess)
+                        {
+                            _logger.LogError("Failed to cancel payment on gateway: {ExternalId} - {Error}",
+                                externalId, cancelResult.ErrorMessage);
+                            payment.ErrorMessage = $"Cancel on gateway failed: {cancelResult.ErrorMessage}";
+                        }
+                        else
+                        {
+                            cancelledOnGateway = true;
+                        }
                     }
-                    else
+                    catch (InvalidOperationException ex)
                     {
-                        cancelledOnGateway = true;
+                        _logger.LogWarning(ex, "No gateway configured to cancel payment method {PaymentMethod}", payment.PaymentMethod);
+                        payment.ErrorMessage = ex.Message;
                     }
                 }
 
@@ -323,31 +346,28 @@ namespace UnaProject.Infra.Repositories
                     statusDto.AbacateStatus = abacateStatus;
                 }
 
-                // Sync with AvocadoPay if pending.
-                if (!string.IsNullOrEmpty(payment.BillingId) &&
+                // Sync with the payment gateway if pending.
+                var externalIdForSync = !string.IsNullOrEmpty(payment.TransactionId) ? payment.TransactionId : payment.BillingId;
+                if (!string.IsNullOrEmpty(externalIdForSync) &&
                     payment.Status.Equals("pending", StringComparison.OrdinalIgnoreCase))
                 {
                     try
                     {
-                        var billingStatusResult = await _abacatePayService.GetBillingStatusAsync(payment.BillingId);
+                        var gateway = _paymentGatewayResolver.Resolve(payment.PaymentMethod);
+                        var gatewayStatusResult = await gateway.GetStatusAsync(externalIdForSync, cancellationToken);
 
-                        if (billingStatusResult.HasSuccess)
+                        if (gatewayStatusResult.HasSuccess && gatewayStatusResult.Value != null)
                         {
-                            var billingStatus = billingStatusResult.Value!;
+                            var gatewayStatus = gatewayStatusResult.Value;
 
-                            if (billingStatus.Status != payment.Status)
+                            if (gatewayStatus.Status != payment.Status)
                             {
-                                payment.Status = billingStatus.Status.ToLowerInvariant();
+                                payment.Status = gatewayStatus.Status.ToLowerInvariant();
                                 payment.UpdatedAt = DateTime.UtcNow;
 
-                                if (billingStatus.PaidAt.HasValue)
+                                if (gatewayStatus.PaidAt.HasValue)
                                 {
-                                    payment.ProcessedAt = billingStatus.PaidAt;
-                                }
-
-                                if (billingStatus.PlatformFee.HasValue)
-                                {
-                                    payment.Fee = billingStatus.PlatformFee;
+                                    payment.ProcessedAt = gatewayStatus.PaidAt;
                                 }
 
                                 await _context.SaveChangesAsync(cancellationToken);
@@ -355,13 +375,12 @@ namespace UnaProject.Infra.Repositories
                                 statusDto.Status = payment.Status;
                                 statusDto.UpdatedAt = payment.UpdatedAt;
                                 statusDto.ProcessedAt = payment.ProcessedAt;
-                                statusDto.Fee = payment.Fee;
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Failed to sync payment status with AbacatePay: {PaymentId}", payment.Id);
+                        _logger.LogWarning(ex, "Failed to sync payment status with gateway: {PaymentId}", payment.Id);
                     }
                 }
 
@@ -484,6 +503,30 @@ namespace UnaProject.Infra.Repositories
                 result.WithException("Error getting payments for order");
                 return result;
             }
+        }
+
+        public async Task<PaymentStatisticsResponse> GetPaymentStatistics(Guid? userId, CancellationToken cancellationToken)
+        {
+            var query = _context.Payments.AsQueryable();
+
+            if (userId.HasValue)
+                query = query.Where(p => p.Order.UserId == userId.Value);
+
+            var payments = await query.ToListAsync(cancellationToken);
+
+            var stats = new PaymentStatisticsResponse
+            {
+                TotalPayments = payments.Count,
+                SuccessfulPayments = payments.Count(p => p.Status.Equals("paid", StringComparison.OrdinalIgnoreCase) || p.Status.Equals("succeeded", StringComparison.OrdinalIgnoreCase)),
+                FailedPayments = payments.Count(p => p.Status.Equals("failed", StringComparison.OrdinalIgnoreCase) || p.Status.Equals("error", StringComparison.OrdinalIgnoreCase)),
+                PendingPayments = payments.Count(p => p.Status.Equals("pending", StringComparison.OrdinalIgnoreCase)),
+                TotalAmount = payments.Where(p => p.Status.Equals("paid", StringComparison.OrdinalIgnoreCase) || p.Status.Equals("succeeded", StringComparison.OrdinalIgnoreCase)).Sum(p => p.Amount),
+                AveragePayment = payments.Any(p => p.Status.Equals("paid", StringComparison.OrdinalIgnoreCase) || p.Status.Equals("succeeded", StringComparison.OrdinalIgnoreCase))
+                    ? payments.Where(p => p.Status.Equals("paid", StringComparison.OrdinalIgnoreCase) || p.Status.Equals("succeeded", StringComparison.OrdinalIgnoreCase)).Average(p => p.Amount)
+                    : 0
+            };
+
+            return stats;
         }
     }
 }

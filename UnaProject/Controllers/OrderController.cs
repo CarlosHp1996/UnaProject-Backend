@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
@@ -18,6 +18,7 @@ namespace UnaProject.Web.Controllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
+    [Route("api/orders")]
     public class OrderController : ControllerBase
     {
         private readonly IMediator _mediator;
@@ -158,7 +159,7 @@ namespace UnaProject.Web.Controllers
             try
             {
                 // Create payment command
-                var paymentCommand = new CreateAbacatePaymentCommand(
+                var paymentCommand = new CreatePaymentCommand(
                     orderId,
                     request.Amount,
                     request.PaymentMethod,
@@ -181,6 +182,30 @@ namespace UnaProject.Web.Controllers
             {
                 return StatusCode(500, new { message = "Internal server error while processing checkout" });
             }
+        }
+
+        [SwaggerOperation(
+            Summary = "Get Order Statistics",
+            Description = "Retrieves statistics for orders (user-specific or global).")]
+        [SwaggerResponse(200, "Success", typeof(Result<OrderStatisticsResponse>))]
+        [HttpGet("statistics")]
+        public async Task<IActionResult> GetStatistics()
+        {
+            Guid? userId = null;
+            if (!User.IsInRole("Admin"))
+            {
+                var id = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (id != null)
+                    userId = Guid.Parse(id);
+            }
+
+            var query = new GetOrderStatisticsQuery(userId);
+            var result = await _mediator.Send(query);
+
+            if (result.HasSuccess)
+                return Ok(result);
+
+            return BadRequest(result.Errors);
         }
     }
 }

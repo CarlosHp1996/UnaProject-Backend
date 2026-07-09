@@ -26,5 +26,11 @@ namespace UnaProject.Application.Models.Dtos
         public DateTime? ExpiresAt { get; set; }
         public decimal Amount { get; set; }
         public bool DevMode { get; set; }
+
+        /// <summary>
+        /// PaymentIntent.ClientSecret do Stripe, usado pelo frontend (Stripe Elements/Stripe.js)
+        /// para confirmar o pagamento no navegador. Nulo para gateways que não usam esse fluxo (ex.: AbacatePay).
+        /// </summary>
+        public string? ClientSecret { get; set; }
     }
 }

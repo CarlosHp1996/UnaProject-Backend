@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using UnaProject.Application.Interfaces;
 using UnaProject.Application.Models.Filters;
 using UnaProject.Application.Models.Requests.Orders;
@@ -426,6 +426,28 @@ namespace UnaProject.Infra.Repositories
 
             await _context.SaveChangesAsync(cancellationToken);
             return true;
+        }
+
+        public async Task<OrderStatisticsResponse> GetOrderStatistics(Guid? userId, CancellationToken cancellationToken)
+        {
+            var query = _context.Orders.Where(o => o.IsActive);
+
+            if (userId.HasValue)
+                query = query.Where(o => o.UserId == userId.Value);
+
+            var orders = await query.ToListAsync(cancellationToken);
+
+            var stats = new OrderStatisticsResponse
+            {
+                TotalOrders = orders.Count,
+                PendingOrders = orders.Count(o => o.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase)),
+                CompletedOrders = orders.Count(o => o.Status.Equals("Delivered", StringComparison.OrdinalIgnoreCase) || o.Status.Equals("Finish", StringComparison.OrdinalIgnoreCase)),
+                CancelledOrders = orders.Count(o => o.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)),
+                TotalRevenue = orders.Where(o => !o.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)).Sum(o => o.TotalAmount),
+                AverageOrderValue = orders.Count > 0 ? orders.Average(o => o.TotalAmount) : 0
+            };
+
+            return stats;
         }
     }
 }

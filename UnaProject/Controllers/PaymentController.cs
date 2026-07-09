@@ -3,35 +3,43 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using UnaProject.Application.Commands.Payments;
+using UnaProject.Application.Interfaces;
 using UnaProject.Application.Models.Requests.Payments;
 using UnaProject.Application.Models.Dtos;
 using UnaProject.Application.Queries.Payments;
 using UnaProject.Domain.Helpers;
+using UnaProject.Application.Models.Responses.Payments;
+using CreateAbacatePaymentResponse = UnaProject.Application.Models.Dtos.CreateAbacatePaymentResponse;
 
 namespace UnaProject.Web.Controllers
 {
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
+    [Route("api/payments")]
     public class PaymentController : ControllerBase
     {
         private readonly IMediator _mediator;
+        private readonly IConfiguration _configuration;
+        private readonly IPaymentGatewayResolver _paymentGatewayResolver;
 
-        public PaymentController(IMediator mediator)
+        public PaymentController(IMediator mediator, IConfiguration configuration, IPaymentGatewayResolver paymentGatewayResolver)
         {
             _mediator = mediator;
+            _configuration = configuration;
+            _paymentGatewayResolver = paymentGatewayResolver;
         }
 
         [SwaggerOperation(
             Summary = "Create new payment",
-            Description = "Creates a new payment via PIX or credit card through AbacatePay")]
+            Description = "Creates a new payment via PIX or credit card through Stripe")]
         [SwaggerResponse(200, "Payment created successfully", typeof(Result<CreateAbacatePaymentResponse>))]
         [SwaggerResponse(400, "Validation error")]
         [SwaggerResponse(500, "Internal server error")]
         [HttpPost("create")]
         public async Task<IActionResult> CreatePayment([FromBody] CreateAbacatePaymentRequest request)
         {
-            var command = new CreateAbacatePaymentCommand(
+            var command = new CreatePaymentCommand(
                 request.OrderId,
                 request.Amount,
                 request.PaymentMethod,
@@ -80,7 +88,7 @@ namespace UnaProject.Web.Controllers
         [HttpPost("{id}/cancel")]
         public async Task<IActionResult> CancelPayment(Guid id, [FromBody] CancelPaymentRequest? request)
         {
-            var command = new CancelAbacatePaymentCommand(id, request?.Reason ?? "Cancellation requested by user");
+            var command = new CancelPaymentCommand(id, request?.Reason ?? "Cancellation requested by user");
 
             var response = await _mediator.Send(command);
 
@@ -92,23 +100,47 @@ namespace UnaProject.Web.Controllers
 
         [SwaggerOperation(
             Summary = "Process payment webhook",
-            Description = "Endpoint to receive webhooks from AbacatePay about payment status changes")]
+            Description = "Endpoint to receive webhooks from the payment gateway (Stripe) about payment status changes")]
         [SwaggerResponse(200, "Webhook processed successfully")]
         [SwaggerResponse(400, "Error processing webhook")]
         [SwaggerResponse(500, "Internal server error")]
         [AllowAnonymous]
-        [HttpPost("webhook")]
-        public async Task<IActionResult> ProcessWebhook([FromBody] object payload)
+        [HttpPost("webhook/{provider}")]
+        public async Task<IActionResult> ProcessWebhook(string provider)
         {
             try
             {
-                // Extract signature from header
-                var signature = Request.Headers["X-Signature"].FirstOrDefault();
-                var webhookSecret = "your-webhook-secret"; // Should come from configuration
+                // Lê o corpo RAW da requisição ANTES de qualquer parse JSON — necessário para
+                // validar a assinatura HMAC do Stripe (Stripe-Signature), que é calculada sobre os bytes originais.
+                using var reader = new StreamReader(Request.Body);
+                var rawBody = await reader.ReadToEndAsync();
 
-                var payloadString = System.Text.Json.JsonSerializer.Serialize(payload);
+                var signature = Request.Headers["Stripe-Signature"].FirstOrDefault()
+                    ?? Request.Headers["X-Signature"].FirstOrDefault();
 
-                var command = new ProcessPaymentWebhookCommand(payloadString, signature, webhookSecret,
+                IPaymentGateway gateway;
+                try
+                {
+                    gateway = _paymentGatewayResolver.ResolveByProvider(provider);
+                }
+                catch (InvalidOperationException)
+                {
+                    return BadRequest(new { error = $"Unknown payment provider: {provider}" });
+                }
+
+                var webhookSecret = provider.Equals("stripe", StringComparison.OrdinalIgnoreCase)
+                    ? _configuration["Stripe:STRIPE_WEBHOOK_SECRET"]
+                    : _configuration["AbacatePay:WebhookSecret"];
+
+                var signatureValidation = await gateway.ValidateWebhookSignatureAsync(rawBody, signature, webhookSecret);
+                if (!signatureValidation.HasSuccess || signatureValidation.Value != true)
+                    return BadRequest(new { error = "Invalid webhook signature" });
+
+                var parseResult = await gateway.ParseWebhookEventAsync(rawBody);
+                if (!parseResult.HasSuccess || parseResult.Value == null)
+                    return BadRequest(new { error = "Invalid webhook payload" });
+
+                var command = new ProcessPaymentWebhookCommand(provider, rawBody, signature, webhookSecret,
                     HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
 
                 var response = await _mediator.Send(command);
@@ -118,11 +150,18 @@ namespace UnaProject.Web.Controllers
 
                 return BadRequest(new { error = response.ErrorMessage });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, new { error = "Internal error processing webhook" });
             }
         }
+
+        [SwaggerOperation(
+            Summary = "Process payment webhook (legacy route)",
+            Description = "Rota legada mantida por compatibilidade; assume o provedor 'stripe'.")]
+        [AllowAnonymous]
+        [HttpPost("webhook")]
+        public Task<IActionResult> ProcessWebhookLegacy() => ProcessWebhook("stripe");
 
         [SwaggerOperation(
             Summary = "Get payment by BillingId",
@@ -178,6 +217,32 @@ namespace UnaProject.Web.Controllers
                 return Ok(new { qrCode = response.Value.QrCode, paymentUrl = response.Value.PaymentUrl });
 
             return NotFound(new { error = "QR Code not available for this payment" });
+        }
+
+        [SwaggerOperation(
+            Summary = "Get payment statistics",
+            Description = "Retrieves payment statistics (admin sees all, user sees own)")]
+        [SwaggerResponse(200, "Statistics retrieved successfully", typeof(Result<PaymentStatisticsResponse>))]
+        [HttpGet("statistics")]
+        public async Task<IActionResult> GetStatistics()
+        {
+            Guid? userId = null;
+            if (!User.IsInRole("Admin"))
+            {
+                var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (Guid.TryParse(userIdClaim, out var parsedId))
+                {
+                    userId = parsedId;
+                }
+            }
+
+            var query = new GetPaymentStatisticsQuery(userId);
+            var response = await _mediator.Send(query);
+
+            if (response.HasSuccess)
+                return Ok(response);
+
+            return BadRequest(response);
         }
     }
 }

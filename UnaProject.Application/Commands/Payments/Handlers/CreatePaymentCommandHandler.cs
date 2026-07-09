@@ -7,24 +7,25 @@ using UnaProject.Domain.Helpers;
 
 namespace UnaProject.Application.Commands.Payments.Handlers
 {
-    public class CreateAbacatePaymentCommandHandler : IRequestHandler<CreateAbacatePaymentCommand, Result<CreateAbacatePaymentResponse>>
+    public class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentCommand, Result<CreateAbacatePaymentResponse>>
     {
         private readonly IPaymentRepository _paymentRepository;
-        private readonly ILogger<CreateAbacatePaymentCommandHandler> _logger;
+        private readonly ILogger<CreatePaymentCommandHandler> _logger;
 
-        public CreateAbacatePaymentCommandHandler(
+        public CreatePaymentCommandHandler(
             IPaymentRepository paymentRepository,
-            ILogger<CreateAbacatePaymentCommandHandler> logger)
+            ILogger<CreatePaymentCommandHandler> logger)
         {
             _paymentRepository = paymentRepository;
             _logger = logger;
         }
 
-        public async Task<Result<CreateAbacatePaymentResponse>> Handle(CreateAbacatePaymentCommand request, CancellationToken cancellationToken)
+        public async Task<Result<CreateAbacatePaymentResponse>> Handle(CreatePaymentCommand request, CancellationToken cancellationToken)
         {
             try
             {
-                _logger.LogInformation("Creating AbacatePay payment for order: {OrderId}", request.OrderId);
+                _logger.LogInformation("Creating payment for order: {OrderId} via method {PaymentMethod}",
+                    request.OrderId, request.PaymentMethod);
 
                 var paymentRequest = new CreateAbacatePaymentRequest
                 {
@@ -43,20 +44,19 @@ namespace UnaProject.Application.Commands.Payments.Handlers
 
                 if (!result.HasSuccess)
                 {
-                    _logger.LogError("Failed to create AbacatePay payment: {Error}", result.ErrorMessage);
+                    _logger.LogError("Failed to create payment: {Error}", result.ErrorMessage);
                     var errorResult = new Result<CreateAbacatePaymentResponse>();
                     errorResult.WithError(result.ErrorMessage ?? "Error creating payment");
                     return errorResult;
                 }
 
-                _logger.LogInformation("AbacatePay payment created successfully: {PaymentId}",
-                    result.Value?.PaymentId);
+                _logger.LogInformation("Payment created successfully: {PaymentId}", result.Value?.PaymentId);
 
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating AbacatePay payment for order: {OrderId}", request.OrderId);
+                _logger.LogError(ex, "Error creating payment for order: {OrderId}", request.OrderId);
                 var errorResult = new Result<CreateAbacatePaymentResponse>();
                 errorResult.WithException("Internal error creating payment");
                 return errorResult;

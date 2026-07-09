@@ -5,20 +5,20 @@ using UnaProject.Domain.Helpers;
 
 namespace UnaProject.Application.Commands.Payments.Handlers
 {
-    public class CancelAbacatePaymentCommandHandler : IRequestHandler<CancelAbacatePaymentCommand, ResultValue<bool>>
+    public class CancelPaymentCommandHandler : IRequestHandler<CancelPaymentCommand, ResultValue<bool>>
     {
         private readonly IPaymentRepository _paymentRepository;
-        private readonly ILogger<CancelAbacatePaymentCommandHandler> _logger;
+        private readonly ILogger<CancelPaymentCommandHandler> _logger;
 
-        public CancelAbacatePaymentCommandHandler(
+        public CancelPaymentCommandHandler(
             IPaymentRepository paymentRepository,
-            ILogger<CancelAbacatePaymentCommandHandler> logger)
+            ILogger<CancelPaymentCommandHandler> logger)
         {
             _paymentRepository = paymentRepository;
             _logger = logger;
         }
 
-        public async Task<ResultValue<bool>> Handle(CancelAbacatePaymentCommand request, CancellationToken cancellationToken)
+        public async Task<ResultValue<bool>> Handle(CancelPaymentCommand request, CancellationToken cancellationToken)
         {
             try
             {
