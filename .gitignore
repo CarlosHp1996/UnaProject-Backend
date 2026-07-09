@@ -363,5 +363,6 @@ MigrationBackup/
 FodyWeavers.xsd
 /docker-compose.yml
 
-.github
+.github/*
+!.github/workflows/
 .ai
