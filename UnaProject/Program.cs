@@ -113,7 +113,8 @@ builder.Services.AddSession(options =>
 });
 
 builder.Services.AddScoped<AccessManager>();
-builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+// AutoMapper 15: o overload só-assemblies foi removido; usar AddMaps para escanear os assemblies.
+builder.Services.AddAutoMapper(cfg => cfg.AddMaps(AppDomain.CurrentDomain.GetAssemblies()));
 
 // ===== DBCONTEXT CONFIGURATION =====
 builder.Services.AddDbContext<AppDbContext>(options =>
