@@ -1,4 +1,6 @@
-﻿namespace UnaProject.Application.Models.Dtos
+﻿using UnaProject.Domain.Enums;
+
+namespace UnaProject.Application.Models.Dtos
 {
     public class OrderDto
     {
@@ -6,8 +8,8 @@
         public Guid UserId { get; set; }
         public string UserName { get; set; } = string.Empty;
         public decimal TotalAmount { get; set; }
-        public string Status { get; set; } = string.Empty;
-        public string PaymentStatus { get; set; } = string.Empty;
+        public EnumOrderStatus Status { get; set; } = EnumOrderStatus.Pending;
+        public EnumPaymentStatus PaymentStatus { get; set; } = EnumPaymentStatus.Pending;
         public int OrderNumber { get; set; }
         public DateTime OrderDate { get; set; }
         public DateTime UpdatedAt { get; set; }

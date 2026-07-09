@@ -5,6 +5,7 @@ using UnaProject.Application.Models.Requests.Orders;
 using UnaProject.Application.Models.Responses.Orders;
 using UnaProject.Application.Services.Interfaces;
 using UnaProject.Domain.Entities;
+using UnaProject.Domain.Enums;
 using UnaProject.Domain.Helpers;
 using UnaProject.Infra.Data;
 
@@ -44,8 +45,8 @@ namespace UnaProject.Infra.Repositories
                 Id = Guid.NewGuid(),
                 UserId = request.UserId,
                 AddressId = request.AddressId,
-                Status = "Pending",
-                PaymentStatus = "Pending",
+                Status = EnumOrderStatus.Pending,
+                PaymentStatus = EnumPaymentStatus.Pending,
                 OrderDate = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 TotalAmount = 0,
@@ -148,11 +149,14 @@ namespace UnaProject.Infra.Repositories
             if (filter.UserId.HasValue)
                 query = query.Where(o => o.UserId == filter.UserId.Value);
 
-            if (!string.IsNullOrEmpty(filter.Status))
-                query = query.Where(o => o.Status == filter.Status);
+            // Filtros vêm como string na query (ex.: "shipped"); parse case-insensitive para o enum.
+            if (!string.IsNullOrEmpty(filter.Status) &&
+                Enum.TryParse<EnumOrderStatus>(filter.Status, ignoreCase: true, out var statusFilter))
+                query = query.Where(o => o.Status == statusFilter);
 
-            if (!string.IsNullOrEmpty(filter.PaymentStatus))
-                query = query.Where(o => o.PaymentStatus == filter.PaymentStatus);
+            if (!string.IsNullOrEmpty(filter.PaymentStatus) &&
+                Enum.TryParse<EnumPaymentStatus>(filter.PaymentStatus, ignoreCase: true, out var paymentStatusFilter))
+                query = query.Where(o => o.PaymentStatus == paymentStatusFilter);
 
             if (filter.StartDate.HasValue)
                 query = query.Where(o => o.OrderDate >= filter.StartDate.Value);
@@ -276,21 +280,24 @@ namespace UnaProject.Infra.Repositories
             if (order == null)
                 throw new Exception("Order not found");
 
-            // Update the received fields.
-            if (!string.IsNullOrEmpty(request.Status))
-                order.Status = request.Status;
+            // Update the received fields. Request vem como string (ex.: "shipped"); parse para enum.
+            if (!string.IsNullOrEmpty(request.Status) &&
+                Enum.TryParse<EnumOrderStatus>(request.Status, ignoreCase: true, out var newStatus))
+                order.Status = newStatus;
 
-            if (!string.IsNullOrEmpty(request.PaymentStatus))
-                order.PaymentStatus = request.PaymentStatus;
+            if (!string.IsNullOrEmpty(request.PaymentStatus) &&
+                Enum.TryParse<EnumPaymentStatus>(request.PaymentStatus, ignoreCase: true, out var newPaymentStatus))
+                order.PaymentStatus = newPaymentStatus;
 
             if (request.IsActive.HasValue)
                 order.IsActive = request.IsActive.Value;
 
+            // "Finish" legado -> Delivered (pedido inativado = concluído).
             if (order.IsActive == false)
-                order.Status = "Finish";
+                order.Status = EnumOrderStatus.Delivered;
 
             if (order.IsActive == true)
-                order.Status = "Processing";
+                order.Status = EnumOrderStatus.Processing;
 
             order.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
@@ -394,7 +401,7 @@ namespace UnaProject.Infra.Repositories
         {
             var cutoff = DateTime.UtcNow - pendingTime;
             return await _context.Orders
-                .Where(o => o.Status == "Pending" && o.OrderDate < cutoff)
+                .Where(o => o.Status == EnumOrderStatus.Pending && o.OrderDate < cutoff)
                 .ToListAsync();
         }
 
@@ -447,10 +454,10 @@ namespace UnaProject.Infra.Repositories
             var stats = new OrderStatisticsResponse
             {
                 TotalOrders = orders.Count,
-                PendingOrders = orders.Count(o => o.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase)),
-                CompletedOrders = orders.Count(o => o.Status.Equals("Delivered", StringComparison.OrdinalIgnoreCase) || o.Status.Equals("Finish", StringComparison.OrdinalIgnoreCase)),
-                CancelledOrders = orders.Count(o => o.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)),
-                TotalRevenue = orders.Where(o => !o.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)).Sum(o => o.TotalAmount),
+                PendingOrders = orders.Count(o => o.Status == EnumOrderStatus.Pending),
+                CompletedOrders = orders.Count(o => o.Status == EnumOrderStatus.Delivered),
+                CancelledOrders = orders.Count(o => o.Status == EnumOrderStatus.Cancelled),
+                TotalRevenue = orders.Where(o => o.Status != EnumOrderStatus.Cancelled).Sum(o => o.TotalAmount),
                 AverageOrderValue = orders.Count > 0 ? orders.Average(o => o.TotalAmount) : 0
             };
 

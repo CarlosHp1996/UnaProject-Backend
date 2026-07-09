@@ -87,13 +87,17 @@ namespace UnaProject.Infra.Data
                     .IsRequired()
                     .HasColumnType("decimal(18,2)");
 
+                // Enums persistidos como string legível (PascalCase) na coluna text.
+                // A serialização JSON em minúsculas é feita na camada de API (LowerCaseEnumConverter).
                 entity.Property(o => o.Status)
                     .IsRequired()
-                    .HasMaxLength(20);
+                    .HasMaxLength(20)
+                    .HasConversion<string>();
 
                 entity.Property(o => o.PaymentStatus)
                     .IsRequired()
-                    .HasMaxLength(20);
+                    .HasMaxLength(20)
+                    .HasConversion<string>();
 
                 entity.Property(o => o.OrderDate)
                     .IsRequired();

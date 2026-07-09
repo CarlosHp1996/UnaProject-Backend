@@ -1,4 +1,5 @@
 ﻿using UnaProject.Domain.Entities.Security;
+using UnaProject.Domain.Enums;
 
 namespace UnaProject.Domain.Entities
 {
@@ -8,8 +9,8 @@ namespace UnaProject.Domain.Entities
         public Guid UserId { get; set; }
         public Guid AddressId { get; set; }
         public decimal TotalAmount { get; set; }
-        public string Status { get; set; } = string.Empty;
-        public string PaymentStatus { get; set; } = string.Empty;
+        public EnumOrderStatus Status { get; set; } = EnumOrderStatus.Pending;
+        public EnumPaymentStatus PaymentStatus { get; set; } = EnumPaymentStatus.Pending;
         public int OrderNumber { get; set; }
         public DateTime OrderDate { get; set; }
         public DateTime UpdatedAt { get; set; }

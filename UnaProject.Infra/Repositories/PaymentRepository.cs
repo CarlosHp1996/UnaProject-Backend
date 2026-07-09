@@ -192,7 +192,9 @@ namespace UnaProject.Infra.Repositories
 
                     if (order != null)
                     {
-                        order.Status = "Paid";
+                        // Correção de bucket (Fase 3): "Paid" é status de PAGAMENTO, não de fulfillment.
+                        // Antes gravava order.Status = "Paid" (bucket errado); agora vai em PaymentStatus.
+                        order.PaymentStatus = EnumPaymentStatus.Paid;
                         order.UpdatedAt = DateTime.UtcNow;
                     }
                 }
