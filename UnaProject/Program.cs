@@ -43,39 +43,6 @@ string ConvertDatabaseUrl(string databaseUrl)
     }
 }
 
-// ===== FUNCTION TO CONVERT REDIS_URL =====
-string ConvertRedisUrl(string redisUrl)
-{
-    if (string.IsNullOrEmpty(redisUrl))
-        return "localhost:6379";
-
-    try
-    {
-        if (redisUrl.StartsWith("redis://"))
-        {
-            var uri = new Uri(redisUrl);
-            var host = uri.Host;
-            var port = uri.Port;
-            var password = !string.IsNullOrEmpty(uri.UserInfo) ? uri.UserInfo.Split(':').Last() : null;
-
-            if (!string.IsNullOrEmpty(password))
-            {
-                return $"{host}:{port},password={password}";
-            }
-            else
-            {
-                return $"{host}:{port}";
-            }
-        }
-        return redisUrl;
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error converting REDIS_URL: {ex.Message}");
-        return "localhost:6379";
-    }
-}
-
 // ===== CONNECTION STRING CONFIGURATION =====
 var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
 string connectionString;

@@ -51,7 +51,7 @@ namespace UnaProject.Application.Queries.Products.Handlers
 
                     Pagination = new PaginationDto
                     {
-                        CurrentPage = query.Filter.Page ?? 1,
+                        CurrentPage = filter.Page ?? 1,
                         PageSize = pageSize,
                         TotalItems = totalCount,
                         TotalPages = pageCount

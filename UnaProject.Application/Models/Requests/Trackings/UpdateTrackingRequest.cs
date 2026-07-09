@@ -2,13 +2,13 @@
 {
     public class UpdateTrackingRequest
     {
-        public string Status { get; set; }
+        public string Status { get; set; } = string.Empty;
 
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
-        public string Location { get; set; }
+        public string Location { get; set; } = string.Empty;
 
         public DateTime EventDate { get; set; }
-        public string TrackingNumber { get; set; }
+        public string TrackingNumber { get; set; } = string.Empty;
     }
 }

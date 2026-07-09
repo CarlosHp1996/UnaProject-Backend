@@ -181,7 +181,7 @@ namespace UnaProject.Infra.Repositories
 
                 if (request.InventoryId is not null)
                 {
-                    existingProduct.Inventory.Quantity = (int)request.StockQuantity;
+                    existingProduct.Inventory.Quantity = request.StockQuantity ?? existingProduct.StockQuantity;
                     existingProduct.Inventory.LastUpdated = DateTime.UtcNow;
                 }
                 else
@@ -189,7 +189,7 @@ namespace UnaProject.Infra.Repositories
                     product.Inventory = new Inventory
                     {
                         ProductId = product.Id,
-                        Quantity = (int)request.StockQuantity,
+                        Quantity = request.StockQuantity ?? existingProduct.StockQuantity,
                         LastUpdated = DateTime.UtcNow
                     };
                 }
@@ -240,7 +240,7 @@ namespace UnaProject.Infra.Repositories
             }
         }
 
-        public async Task<Product> GetProductById(Guid id)
+        public async Task<Product?> GetProductById(Guid id)
         {
             var product = await _context.Products
             .Where(x => x.Id == id)

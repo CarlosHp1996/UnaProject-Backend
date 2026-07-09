@@ -36,7 +36,7 @@ namespace UnaProject.Domain.Security
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim("id", user.Id.ToString()),
-                new Claim("name", user.UserName),
+                new Claim("name", user.UserName ?? string.Empty),
                 new Claim("profilePicture", user.ProfilePicture ?? "")
             };
 

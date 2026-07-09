@@ -74,15 +74,15 @@ namespace UnaProject.Infra.Repositories
                     {
                         applicationUser.Addresses.Add(new Address
                         {
-                            Street = addressDto.Street,
-                            CompletName = addressDto.CompletName,
-                            City = addressDto.City,
-                            State = (Domain.Enums.EnumState)addressDto.State,
-                            ZipCode = addressDto.ZipCode,
-                            Neighborhood = addressDto.Neighborhood,
-                            Number = addressDto.Number,
+                            Street = addressDto.Street ?? "Não informado",
+                            CompletName = addressDto.CompletName ?? userName ?? "Usuário",
+                            City = addressDto.City ?? "Não informado",
+                            State = addressDto.State ?? Domain.Enums.EnumState.SP,
+                            ZipCode = addressDto.ZipCode ?? "00000-000",
+                            Neighborhood = addressDto.Neighborhood ?? "Não informado",
+                            Number = addressDto.Number ?? "S/N",
                             Complement = addressDto.Complement,
-                            MainAddress = (bool)addressDto.MainAddress
+                            MainAddress = addressDto.MainAddress ?? true
                         });
                     }
                 }
@@ -138,14 +138,14 @@ namespace UnaProject.Infra.Repositories
             try
             {
                 var result = new Result<UpdateUserResponse>();
-                ApplicationUser user;
+                ApplicationUser? user;
 
                 // If it's a password recovery, search for the user by email.
                 if (request.IsPasswordRecovery && !string.IsNullOrWhiteSpace(request.Email))
                 {
                     user = await _context.Users
                                          .Include(u => u.Addresses)
-                                         .FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower().Trim(), cancellationToken);
+                                         .FirstOrDefaultAsync(u => u.Email!.ToLower() == request.Email.ToLower().Trim(), cancellationToken);
 
                     if (user == null)
                         throw new Exception("User not found with this email.");
@@ -379,8 +379,8 @@ namespace UnaProject.Infra.Repositories
                 {
                     string searchTerm = filter.SearchTerm.ToLower();
                     usersQuery = usersQuery.Where(u =>
-                        u.UserName.ToLower().Contains(searchTerm) ||
-                        u.Email.ToLower().Contains(searchTerm) ||
+                        u.UserName!.ToLower().Contains(searchTerm) ||
+                        u.Email!.ToLower().Contains(searchTerm) ||
                         (u.PhoneNumber != null && u.PhoneNumber.Contains(searchTerm))
                     );
                 }

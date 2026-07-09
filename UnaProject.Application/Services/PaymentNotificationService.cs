@@ -175,6 +175,7 @@ namespace UnaProject.Application.Services
 
         private async Task<string> GeneratePaymentCreatedEmailTemplate(Guid paymentId)
         {
+            await Task.CompletedTask;
             return $@"
             <html>
             <body style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
@@ -196,6 +197,7 @@ namespace UnaProject.Application.Services
 
         private async Task<string> GeneratePaymentConfirmedEmailTemplate(Guid paymentId)
         {
+            await Task.CompletedTask;
             return $@"
             <html>
             <body style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
@@ -217,6 +219,7 @@ namespace UnaProject.Application.Services
 
         private async Task<string> GeneratePaymentCancelledEmailTemplate(Guid paymentId)
         {
+            await Task.CompletedTask;
             return $@"
             <html>
             <body style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
@@ -238,6 +241,7 @@ namespace UnaProject.Application.Services
 
         private async Task<string> GeneratePaymentExpiredEmailTemplate(Guid paymentId)
         {
+            await Task.CompletedTask;
             return $@"
             <html>
             <body style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
@@ -259,6 +263,7 @@ namespace UnaProject.Application.Services
 
         private async Task<string> GeneratePaymentFailedAdminEmailTemplate(Guid paymentId, string errorMessage)
         {
+            await Task.CompletedTask;
             return $@"
             <html>
             <body style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
@@ -283,6 +288,7 @@ namespace UnaProject.Application.Services
 
         private async Task<string> GenerateWebhookFailedAdminEmailTemplate(Guid paymentId, string webhookEvent, string errorMessage, int attemptCount)
         {
+            await Task.CompletedTask;
             return $@"
             <html>
             <body style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>

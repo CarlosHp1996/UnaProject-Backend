@@ -248,6 +248,8 @@ namespace UnaProject.Application.Services
 
     public async Task<bool> IsValidEmailAsync(string email)
     {
+      await Task.CompletedTask;
+
       if (string.IsNullOrWhiteSpace(email))
         return false;
 

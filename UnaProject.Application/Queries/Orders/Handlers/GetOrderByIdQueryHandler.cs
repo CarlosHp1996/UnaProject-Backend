@@ -50,7 +50,7 @@ namespace UnaProject.Application.Queries.Orders.Handlers
                     {
                         Id = order.Id,
                         UserId = order.UserId,
-                        UserName = order.User?.UserName,
+                        UserName = order.User?.UserName ?? string.Empty,
                         TotalAmount = order.TotalAmount,
                         Status = order.Status,
                         PaymentStatus = order.PaymentStatus,
@@ -64,8 +64,8 @@ namespace UnaProject.Application.Queries.Orders.Handlers
                             Id = item.Id,
                             OrderId = item.OrderId,
                             ProductId = item.ProductId,
-                            ProductName = item.Product?.Name,
-                            ProductImageUrl = item.Product?.ImageUrls?.FirstOrDefault(),
+                            ProductName = item.Product?.Name ?? string.Empty,
+                            ProductImageUrl = item.Product?.ImageUrls?.FirstOrDefault() ?? string.Empty,
                             Quantity = item.Quantity,
                             UnitPrice = item.UnitPrice
                         }).ToList() ?? new List<OrderItemDto>(),
@@ -79,7 +79,7 @@ namespace UnaProject.Application.Queries.Orders.Handlers
                             Status = payment.Status,
                             PaymentDate = payment.PaymentDate
                         }).ToList() ?? new List<PaymentDto>(),
-                        Addresses = order.User.Addresses?.Select(address => new AddressDto
+                        Addresses = order.User?.Addresses?.Select(address => new AddressDto
                         {
                             Id = address.Id,
                             Street = address.Street,

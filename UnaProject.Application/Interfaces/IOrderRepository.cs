@@ -12,7 +12,7 @@ namespace UnaProject.Application.Interfaces
         Task<IEnumerable<Order>> GetPendingOrders(TimeSpan pendingTime);
 
         Task<(IQueryable<Order> Result, int TotalCount)> Get(GetOrdersRequestFilter filter);
-        Task<Order> GetById(Guid id, CancellationToken cancellationToken);
+        Task<Order?> GetById(Guid id, CancellationToken cancellationToken);
         Task<UpdateOrderResponse> UpdateOrder(Guid id, UpdateOrderRequest request, CancellationToken cancellationToken);
         Task<UpdateOrderItemResponse> UpdateOrderItem(Guid orderId, Guid orderItemId, UpdateOrderItemRequest request, CancellationToken cancellationToken);
         Task<bool> DeleteOrder(Guid id, CancellationToken cancellationToken);

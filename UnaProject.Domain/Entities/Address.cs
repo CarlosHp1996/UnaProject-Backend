@@ -11,25 +11,25 @@ namespace UnaProject.Domain.Entities
         public Guid Id { get; set; }
 
         [Required]
-        public string Street { get; set; }
+        public string Street { get; set; } = string.Empty;
 
         [Required]
-        public string CompletName { get; set; }
+        public string CompletName { get; set; } = string.Empty;
 
         [Required]
-        public string City { get; set; }
+        public string City { get; set; } = string.Empty;
 
         [Required]
         public EnumState State { get; set; }
 
         [Required]
-        public string ZipCode { get; set; }
+        public string ZipCode { get; set; } = string.Empty;
 
         [Required]
-        public string Neighborhood { get; set; }
+        public string Neighborhood { get; set; } = string.Empty;
 
         [Required]
-        public string Number { get; set; }
+        public string Number { get; set; } = string.Empty;
 
         public string? Complement { get; set; }
 
@@ -40,6 +40,6 @@ namespace UnaProject.Domain.Entities
         public Guid UserId { get; set; }
 
         [ForeignKey("UserId")]
-        public virtual ApplicationUser User { get; set; }
+        public virtual ApplicationUser User { get; set; } = null!;
     }
 }

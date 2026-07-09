@@ -8,6 +8,6 @@
         public DateTime LastUpdated { get; set; }
 
         // Navigation
-        public virtual Product Product { get; set; }
+        public virtual Product Product { get; set; } = null!;
     }
 }

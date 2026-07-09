@@ -37,7 +37,7 @@ namespace UnaProject.Controllers
                 return Ok(new
                 {
                     paymentId,
-                    totalLogs = result.Value.Count,
+                    totalLogs = result.Value!.Count,
                     logs = result.Value.Select(log => new
                     {
                         id = log.Id,
@@ -80,7 +80,7 @@ namespace UnaProject.Controllers
                 {
                     startDate,
                     endDate,
-                    totalLogs = result.Value.Count,
+                    totalLogs = result.Value!.Count,
                     logs = result.Value.Select(log => new
                     {
                         id = log.Id,
@@ -114,7 +114,7 @@ namespace UnaProject.Controllers
 
                 return Ok(new
                 {
-                    totalPending = result.Value.Count,
+                    totalPending = result.Value!.Count,
                     webhooks = result.Value.Select(webhook => new
                     {
                         id = webhook.Id,
@@ -178,7 +178,7 @@ namespace UnaProject.Controllers
                 if (!result.HasSuccess)
                     return BadRequest(new { error = result.HasError });
 
-                var logs = result.Value;
+                var logs = result.Value!;
                 var webhooksPendingResult = await _webhookRetryService.GetPendingWebhooksForRetryAsync();
 
                 return Ok(new
@@ -191,7 +191,7 @@ namespace UnaProject.Controllers
                     logsBySource = logs
                         .GroupBy(l => l.Source)
                         .ToDictionary(g => g.Key, g => g.Count()),
-                    webhooksPending = webhooksPendingResult.HasSuccess ? webhooksPendingResult.Value.Count : 0,
+                    webhooksPending = webhooksPendingResult.HasSuccess ? webhooksPendingResult.Value!.Count : 0,
                     lastActivity = logs.OrderByDescending(l => l.CreatedAt).FirstOrDefault()?.CreatedAt
                 });
             }

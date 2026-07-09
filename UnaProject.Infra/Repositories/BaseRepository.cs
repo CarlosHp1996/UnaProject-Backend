@@ -16,7 +16,7 @@ namespace UnaProject.Infra.Repositories
             _entities = dbContext.Set<TEntity>();
         }
 
-        public virtual async Task<TEntity> GetById(Guid id)
+        public virtual async Task<TEntity?> GetById(Guid id)
         {
             return await _dbContext.Set<TEntity>().FindAsync(id);
         }

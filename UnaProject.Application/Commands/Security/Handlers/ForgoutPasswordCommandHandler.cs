@@ -17,6 +17,7 @@ namespace UnaProject.Application.Commands.Security.Handlers
         public async Task<Result<ForgoutPasswordResponse>> Handle(ForgoutPasswordCommand request, CancellationToken cancellationToken)
         {
             var result = new Result<ForgoutPasswordResponse>();
+            await Task.CompletedTask;
             var email = _emailService.SendEmailForgoutPasswordAsync(request.Email);
 
             if (email.Exception != null)

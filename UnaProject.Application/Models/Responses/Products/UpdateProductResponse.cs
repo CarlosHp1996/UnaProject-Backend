@@ -5,8 +5,8 @@ namespace UnaProject.Application.Models.Responses.Products
     public class UpdateProductResponse
     {
         public Guid Id { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
         public decimal Price { get; set; }
         public int StockQuantity { get; set; }
         public List<string> ImageUrls { get; set; } = new List<string>();
@@ -14,6 +14,6 @@ namespace UnaProject.Application.Models.Responses.Products
         public DateTime UpdatedAt { get; set; }
         public List<ProductAttributeDto> Attributes { get; set; } = new List<ProductAttributeDto>();
         public Guid InventoryId { get; set; }
-        public string Message { get; set; }
+        public string Message { get; set; } = string.Empty;
     }
 }

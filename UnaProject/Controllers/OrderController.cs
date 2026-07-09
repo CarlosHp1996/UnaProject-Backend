@@ -72,7 +72,7 @@ namespace UnaProject.Web.Controllers
                 if (orderResult.HasSuccess)
                 {
                     var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-                    if (userId != null && orderResult.Value.Order.UserId != Guid.Parse(userId))
+                    if (userId != null && orderResult.Value!.Order.UserId != Guid.Parse(userId))
                         return Forbid();
                 }
                 else
@@ -178,7 +178,7 @@ namespace UnaProject.Web.Controllers
 
                 return BadRequest(paymentResponse);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, new { message = "Internal server error while processing checkout" });
             }

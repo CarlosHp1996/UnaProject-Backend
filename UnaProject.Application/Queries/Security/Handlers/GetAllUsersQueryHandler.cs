@@ -60,7 +60,7 @@ namespace UnaProject.Application.Queries.Security.Handlers
                         }).ToList() ?? new List<AddressDto>()
                     }),
                     TotalCount = totalCount,
-                    PageCount = (int)Math.Ceiling((decimal)((double)totalCount / filter.PageSize)),
+                    PageCount = (int)Math.Ceiling((decimal)((double)totalCount / (filter.PageSize ?? 10))),
                     CurrentPage = filter.Page,
                     PageSize = filter.PageSize
                 };

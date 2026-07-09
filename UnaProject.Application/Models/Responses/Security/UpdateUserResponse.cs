@@ -4,7 +4,7 @@ namespace UnaProject.Application.Models.Responses.Security
 {
     public class UpdateUserResponse
     {
-        public UserDto User { get; set; }
-        public string Message { get; set; }
+        public UserDto User { get; set; } = null!;
+        public string Message { get; set; } = string.Empty;
     }
 }

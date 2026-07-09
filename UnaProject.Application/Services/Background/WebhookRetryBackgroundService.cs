@@ -70,7 +70,7 @@ namespace UnaProject.Application.Services.Background
 
                 var pendingWebhooks = pendingWebhooksResult.Value;
 
-                if (!pendingWebhooks?.Any() ?? true)
+                if (pendingWebhooks == null || !pendingWebhooks.Any())
                 {
                     _logger.LogDebug("No pending webhooks found for retry");
                     return;

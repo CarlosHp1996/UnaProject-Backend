@@ -14,13 +14,13 @@ namespace UnaProject.Application.Interfaces
         Task<(List<TrackingResponse> Trackings, int TotalCount)> GetTrackingsFilteredAsync(
             int? page,
             int? pageSize,
-            string sortingProp,
+            string? sortingProp,
             bool ascending,
-            string status = null,
+            string? status = null,
             Guid? orderId = null,
-            string trackingNumber = null,
-            string description = null,
-            string location = null,
+            string? trackingNumber = null,
+            string? description = null,
+            string? location = null,
             DateTime? startDate = null,
             DateTime? endDate = null,
             CancellationToken cancellationToken = default);

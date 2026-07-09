@@ -12,7 +12,7 @@ namespace UnaProject.Application.Interfaces
         Task<AsyncOutResult<IEnumerable<Product>, int>> Get(GetProductsRequestFilter filter);
         Task<FiltersDto> GetFiltersData(CancellationToken cancellationToken);
         Task<UpdateProductResponse> UpdateProduct(Product product, UpdateProductRequest request, CancellationToken cancellationToken);
-        Task<Product> GetProductById(Guid id);
+        Task<Product?> GetProductById(Guid id);
         Task<CreateProductResponse> CreateProduct(CreateProductRequest request, CancellationToken cancellationToken);
     }
 }

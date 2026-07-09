@@ -10,6 +10,6 @@ namespace UnaProject.Domain.Entities
         public EnumColor? Color { get; set; }
 
         // Navigation
-        public virtual Product Product { get; set; }
+        public virtual Product Product { get; set; } = null!;
     }
 }

@@ -2,6 +2,6 @@
 {
     public class MigrateCartRequest
     {
-        public string SessionId { get; set; }
+        public string SessionId { get; set; } = string.Empty;
     }
 }

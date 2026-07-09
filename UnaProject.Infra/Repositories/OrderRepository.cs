@@ -110,7 +110,8 @@ namespace UnaProject.Infra.Repositories
                     await transaction.CommitAsync(cancellationToken);
 
                     // Email sent only if everything goes well.
-                    await _emailService.SendEmailConfirmationOrderAsync(order.User.Email);
+                    if (!string.IsNullOrEmpty(user.Email))
+                        await _emailService.SendEmailConfirmationOrderAsync(user.Email);
                 }
                 catch (Exception)
                 {
@@ -325,6 +326,9 @@ namespace UnaProject.Infra.Repositories
             if (quantityDifference > 0)
             {
                 var product = await _context.Products.FindAsync([orderItem.ProductId], cancellationToken);
+                if (product == null)
+                    throw new Exception("Product not found");
+
                 if (product.StockQuantity < quantityDifference)
                     throw new Exception($"Not enough stock for product {product.Name}. Available: {product.StockQuantity}");
 
@@ -335,6 +339,9 @@ namespace UnaProject.Infra.Repositories
             {
                 // We are reducing the quantity, returning it to stock.
                 var product = await _context.Products.FindAsync([orderItem.ProductId], cancellationToken);
+                if (product == null)
+                    throw new Exception("Product not found");
+
                 product.StockQuantity += Math.Abs(quantityDifference);
             }
 

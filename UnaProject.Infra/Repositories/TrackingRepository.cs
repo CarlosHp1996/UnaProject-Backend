@@ -43,10 +43,14 @@ namespace UnaProject.Infra.Repositories
                     CreatedAt = DateTime.UtcNow
                 };
 
-                var email = _emailService.SendEmailConfirmationTrackingAsync(order.User.Email);
+                var userEmail = order.User.Email;
+                if (!string.IsNullOrEmpty(userEmail))
+                {
+                    var email = _emailService.SendEmailConfirmationTrackingAsync(userEmail);
 
-                if (email.Exception != null)
-                    throw new KeyNotFoundException("Error sending tracking email.");
+                    if (email.Exception != null)
+                        throw new KeyNotFoundException("Error sending tracking email.");
+                }
 
                 _context.Trackings.Add(trackingEvent);
                 await _context.SaveChangesAsync();
@@ -65,7 +69,7 @@ namespace UnaProject.Infra.Repositories
 
                 return response;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 throw;
             }
@@ -103,7 +107,7 @@ namespace UnaProject.Infra.Repositories
 
                 return response;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 throw;
             }
@@ -112,20 +116,22 @@ namespace UnaProject.Infra.Repositories
         public async Task<(List<TrackingResponse> Trackings, int TotalCount)> GetTrackingsFilteredAsync(
             int? page,
             int? pageSize,
-            string sortingProp,
+            string? sortingProp,
             bool ascending,
-            string status = null,
+            string? status = null,
             Guid? orderId = null,
-            string trackingNumber = null,
-            string description = null,
-            string location = null,
+            string? trackingNumber = null,
+            string? description = null,
+            string? location = null,
             DateTime? startDate = null,
             DateTime? endDate = null,
             CancellationToken cancellationToken = default)
         {
             // Calculate pagination
-            var skip = (page - 1) * pageSize;
-            var take = pageSize;
+            var pageNumber = page ?? 1;
+            var size = pageSize ?? 10;
+            var skip = (pageNumber - 1) * size;
+            var take = size;
 
             // Create an initial query
             var query = _context.Trackings.AsQueryable();
@@ -181,8 +187,8 @@ namespace UnaProject.Infra.Repositories
 
             // Apply pagination
             var trackings = await query
-                .Skip((int)skip)
-                .Take((int)take)
+                .Skip(skip)
+                .Take(take)
                 .ToListAsync(cancellationToken);
 
             var trackingResponses = trackings.Select(t => new TrackingResponse

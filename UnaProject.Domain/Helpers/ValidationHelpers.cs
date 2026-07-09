@@ -2,7 +2,7 @@
 {
     public static class ValidationHelpers
     {
-        public static bool IsValidCep(string cep)
+        public static bool IsValidCep(string? cep)
         {
             if (string.IsNullOrWhiteSpace(cep))
                 return false;
@@ -14,7 +14,7 @@
             return cleanedCep.Length == 8;
         }
 
-        public static bool IsValidCpf(string cpf)
+        public static bool IsValidCpf(string? cpf)
         {
             if (string.IsNullOrWhiteSpace(cpf))
                 return false;

@@ -4,7 +4,7 @@
     {
         public Guid UserId { get; set; }
         public Guid AddressId { get; set; }
-        public string PaymentMethod { get; set; }
+        public string PaymentMethod { get; set; } = string.Empty;
         public List<OrderItemRequest> Items { get; set; } = new List<OrderItemRequest>();
     }
 
