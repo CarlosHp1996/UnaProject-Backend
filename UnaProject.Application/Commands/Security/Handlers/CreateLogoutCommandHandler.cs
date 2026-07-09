@@ -1,24 +1,24 @@
-﻿using MediatR;
+using MediatR;
+using UnaProject.Application.Interfaces;
 using UnaProject.Application.Models.Responses.Security;
 using UnaProject.Domain.Helpers;
-using UnaProject.Domain.Security;
 
 namespace UnaProject.Application.Commands.Security.Handlers
 {
     public class CreateLogoutCommandHandler : IRequestHandler<CreateLogoutCommand, Result<CreateLogoutResponse>>
     {
-        private readonly AccessManager _accessManager;
+        private readonly ITokenBlacklistService _tokenBlacklist;
 
-        public CreateLogoutCommandHandler(AccessManager accessManager)
+        public CreateLogoutCommandHandler(ITokenBlacklistService tokenBlacklist)
         {
-            _accessManager = accessManager;
+            _tokenBlacklist = tokenBlacklist;
         }
 
         public async Task<Result<CreateLogoutResponse>> Handle(CreateLogoutCommand request, CancellationToken cancellationToken)
         {
             var result = new Result<CreateLogoutResponse>();
 
-            await _accessManager.InvalidateToken(request.Request.Token);
+            await _tokenBlacklist.BlacklistTokenAsync(request.Request.Token, cancellationToken);
 
             var response = new CreateLogoutResponse
             {

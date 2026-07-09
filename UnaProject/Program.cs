@@ -5,6 +5,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using StackExchange.Redis;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using UnaProject.Application.Interfaces;
@@ -59,7 +60,16 @@ else
     Console.WriteLine("Using local connection string");
 }
 
-Console.WriteLine($"Connection String: {connectionString.Substring(0, Math.Min(50, connectionString.Length))}...");
+// Não logar a connection string (contém credenciais). Log apenas o host, sem usuário/senha.
+try
+{
+    var csBuilder = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+    Console.WriteLine($"Database host: {csBuilder.Host}:{csBuilder.Port}/{csBuilder.Database}");
+}
+catch
+{
+    // se não conseguir parsear, não imprime nada sensível
+}
 // ===== END CONNECTION STRING CONFIGURATION =====
 
 // Add services to the container.
@@ -69,7 +79,77 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 
-builder.Services.AddDistributedMemoryCache();
+// ===== DISTRIBUTED CACHE (Redis com fallback para memória) =====
+// Converte uma REDIS_URL no formato redis://[:password@]host:port (Railway/Heroku) para a
+// connection string do StackExchange.Redis (host:port,password=...,ssl=...).
+static string ConvertRedisUrl(string redisUrl)
+{
+    if (string.IsNullOrWhiteSpace(redisUrl))
+        return string.Empty;
+
+    try
+    {
+        var uri = new Uri(redisUrl);
+        var port = uri.Port > 0 ? uri.Port : 6379;
+        var config = $"{uri.Host}:{port}";
+
+        if (!string.IsNullOrEmpty(uri.UserInfo))
+        {
+            var parts = uri.UserInfo.Split(':');
+            var password = parts.Length > 1 ? parts[1] : parts[0];
+            if (!string.IsNullOrEmpty(password))
+                config += $",password={password}";
+        }
+
+        if (redisUrl.StartsWith("rediss://", StringComparison.OrdinalIgnoreCase))
+            config += ",ssl=true";
+
+        return config;
+    }
+    catch
+    {
+        return redisUrl; // deixa o StackExchange.Redis tentar interpretar direto
+    }
+}
+
+var redisUrlEnv = Environment.GetEnvironmentVariable("REDIS_URL");
+var redisConnectionString = !string.IsNullOrWhiteSpace(redisUrlEnv)
+    ? ConvertRedisUrl(redisUrlEnv)
+    : (builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379");
+
+// Testa a conexão no startup SEM travar o boot: AbortOnConnectFail=false + ConnectTimeout curto.
+// Se o Redis não conectar, cai no cache em memória (AddDistributedMemoryCache) e o app sobe normalmente.
+bool redisAvailable = false;
+try
+{
+    var redisOptions = ConfigurationOptions.Parse(redisConnectionString);
+    redisOptions.AbortOnConnectFail = false;
+    redisOptions.ConnectTimeout = 3000;
+    redisOptions.ConnectRetry = 1;
+    using var testConnection = ConnectionMultiplexer.Connect(redisOptions);
+    redisAvailable = testConnection.IsConnected;
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"AVISO: falha ao conectar no Redis ({ex.Message}).");
+}
+
+if (redisAvailable)
+{
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnectionString;
+        options.InstanceName = "Una";
+    });
+    Console.WriteLine("Cache distribuído: Redis conectado.");
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+    Console.WriteLine("AVISO: Redis indisponível — usando cache em memória (AddDistributedMemoryCache) como fallback.");
+}
+// ===== END DISTRIBUTED CACHE =====
+
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromHours(1);
@@ -80,6 +160,8 @@ builder.Services.AddSession(options =>
 });
 
 builder.Services.AddScoped<AccessManager>();
+// Blacklist de token JWT via IDistributedCache (Redis quando disponível, memória no fallback).
+builder.Services.AddScoped<ITokenBlacklistService, TokenBlacklistService>();
 // AutoMapper 15: o overload só-assemblies foi removido; usar AddMaps para escanear os assemblies.
 builder.Services.AddAutoMapper(cfg => cfg.AddMaps(AppDomain.CurrentDomain.GetAssemblies()));
 
@@ -94,42 +176,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         npgsqlOptions.CommandTimeout(30);
     }));
 // ===== END DBCONTEXT CONFIGURATION =====
-
-// ===== REDIS CONFIGURATION =====
-//var redisUrl = Environment.GetEnvironmentVariable("REDIS_URL");
-//string redisConnectionString;
-
-//if (!string.IsNullOrEmpty(redisUrl))
-//{
-//    redisConnectionString = ConvertRedisUrl(redisUrl);
-//    Console.WriteLine("Using Railway's REDIS_URL");
-//}
-//else
-//{
-//    redisConnectionString = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
-//    Console.WriteLine("Using Redis local connection string");
-//}
-
-//Console.WriteLine($"Redis Connection: {redisConnectionString}");
-
-//try
-//{
-//    builder.Services.AddStackExchangeRedisCache(options =>
-//    {
-//        options.Configuration = redisConnectionString;
-//        options.InstanceName = "Una";
-//    });
-//    builder.Services.AddScoped<ICartService, CartService>();
-//    Console.WriteLine("Redis configured successfully!");
-//}
-//catch (Exception ex)
-//{
-//    Console.WriteLine($"Error configuring Redis: {ex.Message}");
-//    Console.WriteLine("Using in-memory cache as fallback...");
-//    builder.Services.AddMemoryCache();
-//    builder.Services.AddScoped<ICartService, CartService>();
-//}
-// ===== END REDIS CONFIGURATION =====
 
 // Register other services
 builder.Services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
@@ -239,11 +285,11 @@ builder.Logging.SetMinimumLevel(LogLevel.Information);
 // ===== IDENTITY CONFIGURATION =====
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
 {
-    options.Password.RequireDigit = false;
-    options.Password.RequireLowercase = false;
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
     options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase = false;
-    options.Password.RequiredLength = 1;
+    options.Password.RequireUppercase = true;
+    options.Password.RequiredLength = 8;
     options.Password.RequiredUniqueChars = 1;
 })
 .AddEntityFrameworkStores<AppDbContext>()
@@ -286,13 +332,13 @@ builder.Services.AddAuthentication(options =>
 
     options.Events = new JwtBearerEvents
     {
-        OnTokenValidated = context =>
+        OnTokenValidated = async context =>
         {
             try
             {
-                var accessManager = context.HttpContext.RequestServices.GetRequiredService<AccessManager>();
+                var blacklist = context.HttpContext.RequestServices.GetRequiredService<ITokenBlacklistService>();
                 var token = context.SecurityToken as JwtSecurityToken;
-                if (token != null && AccessManager.IsTokenBlacklisted(token.RawData))
+                if (token != null && await blacklist.IsBlacklistedAsync(token.RawData, context.HttpContext.RequestAborted))
                 {
                     context.Fail("This token has been invalidated..");
                 }
@@ -301,7 +347,6 @@ builder.Services.AddAuthentication(options =>
             {
                 Console.WriteLine($"Token validation error: {ex.Message}");
             }
-            return Task.CompletedTask;
         }
     };
 });
@@ -367,37 +412,7 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// ===== REDIS CONNECTION TEST =====
-using (var scope = app.Services.CreateScope())
-{
-    try
-    {
-        var cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-
-        await cache.SetStringAsync("test-connection", "Redis connected!", new DistributedCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1)
-        }, cts.Token);
-
-        var testValue = await cache.GetStringAsync("test-connection", cts.Token);
-
-        if (testValue != null)
-        {
-            Console.WriteLine("Redis connected successfully!");
-        }
-        else
-        {
-            Console.WriteLine("❌ Redis connection test failed");
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error testing Redis: {ex.Message}");
-        Console.WriteLine("Application will continue without Redis Cache...");
-    }
-}
-// ===== END REDIS CONNECTION TEST =====
+// Conexão do Redis já foi testada no registro do cache (com fallback para memória).
 
 // ===== APPLY MIGRATIONS AND INITIALIZE DATABASE =====
 using (var scope = app.Services.CreateScope())
