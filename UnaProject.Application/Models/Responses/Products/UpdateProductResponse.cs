@@ -13,7 +13,6 @@ namespace UnaProject.Application.Models.Responses.Products
         public bool IsActive { get; set; }
         public DateTime UpdatedAt { get; set; }
         public List<ProductAttributeDto> Attributes { get; set; } = new List<ProductAttributeDto>();
-        public Guid InventoryId { get; set; }
         public string Message { get; set; } = string.Empty;
     }
 }

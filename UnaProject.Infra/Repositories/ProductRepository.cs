@@ -141,7 +141,6 @@ namespace UnaProject.Infra.Repositories
             {
                 var existingProduct = await _context.Products
                     .Include(p => p.Attributes)
-                    .Include(p => p.Inventory)
                     .FirstOrDefaultAsync(p => p.Id == product.Id, cancellationToken) ?? throw new Exception($"Product with ID {product.Id} not found.");
 
                 if (request.NewImages != null && request.NewImages.Any())
@@ -179,21 +178,6 @@ namespace UnaProject.Infra.Repositories
                     existingProduct.IsActive = (bool)request.IsActive;
                 existingProduct.UpdatedAt = DateTime.UtcNow;
 
-                if (request.InventoryId is not null)
-                {
-                    existingProduct.Inventory.Quantity = request.StockQuantity ?? existingProduct.StockQuantity;
-                    existingProduct.Inventory.LastUpdated = DateTime.UtcNow;
-                }
-                else
-                {
-                    product.Inventory = new Inventory
-                    {
-                        ProductId = product.Id,
-                        Quantity = request.StockQuantity ?? existingProduct.StockQuantity,
-                        LastUpdated = DateTime.UtcNow
-                    };
-                }
-
                 // Remove old attributes
                 _context.ProductAttributes.RemoveRange(product.Attributes);
 
@@ -224,7 +208,6 @@ namespace UnaProject.Infra.Repositories
                     ImageUrls = product.ImageUrls,
                     IsActive = product.IsActive,
                     UpdatedAt = product.UpdatedAt,
-                    InventoryId = product.Inventory.Id,
                     Attributes = product.Attributes
                         .Select(a => new ProductAttributeDto
                         {
@@ -245,7 +228,6 @@ namespace UnaProject.Infra.Repositories
             var product = await _context.Products
             .Where(x => x.Id == id)
             .Include(p => p.Attributes)
-            .Include(p => p.Inventory)
             .Include(p => p.OrderItems)
             .FirstOrDefaultAsync();
 
@@ -295,15 +277,6 @@ namespace UnaProject.Infra.Repositories
                 };
 
                 _context.Products.Add(product);
-
-                var inventory = new Inventory
-                {
-                    Id = Guid.NewGuid(),
-                    ProductId = product.Id,
-                    Quantity = request.StockQuantity,
-                    LastUpdated = now
-                };
-                _context.Inventories.Add(inventory);
 
                 var productAttributes = new List<ProductAttribute>();
                 if (request.Attributes != null)

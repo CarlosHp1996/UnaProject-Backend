@@ -18,6 +18,5 @@ namespace UnaProject.Application.Models.Requests.Products
         public List<string>? RemovedImageUrls { get; set; } = new List<string>();
         public bool? IsActive { get; set; }
         public List<ProductAttributeDto>? Attributes { get; set; } = new List<ProductAttributeDto>();
-        public Guid? InventoryId { get; set; }
     }
 }

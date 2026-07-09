@@ -14,7 +14,6 @@ namespace UnaProject.Infra.Data
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<ProductAttribute> ProductAttributes { get; set; }
-        public DbSet<Inventory> Inventories { get; set; }
         public DbSet<Payment> Payments { get; set; }
         public DbSet<Tracking> Trackings { get; set; }
         public DbSet<Address> Addresses { get; set; }
@@ -71,10 +70,6 @@ namespace UnaProject.Infra.Data
                 entity.HasMany(p => p.Attributes)
                     .WithOne(pa => pa.Product)
                     .HasForeignKey(pa => pa.ProductId);
-
-                entity.HasOne(p => p.Inventory)
-                    .WithOne(i => i.Product)
-                    .HasForeignKey<Inventory>(i => i.ProductId);
             });
 
             // Order Configuration
@@ -146,19 +141,6 @@ namespace UnaProject.Infra.Data
             {
                 entity.ToTable("ProductAttributes");
                 entity.HasKey(pa => pa.Id);
-            });
-
-            // Inventory Configuration
-            modelBuilder.Entity<Inventory>(entity =>
-            {
-                entity.ToTable("Inventory");
-                entity.HasKey(i => i.Id);
-
-                entity.Property(i => i.Quantity)
-                    .IsRequired();
-
-                entity.Property(i => i.LastUpdated)
-                    .IsRequired();
             });
 
             // Payment Configuration

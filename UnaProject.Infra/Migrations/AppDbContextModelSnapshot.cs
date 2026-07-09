@@ -209,29 +209,6 @@ namespace UnaProject.Infra.Migrations
                     b.ToTable("Addresses", (string)null);
                 });
 
-            modelBuilder.Entity("UnaProject.Domain.Entities.Inventory", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Quantity")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId")
-                        .IsUnique();
-
-                    b.ToTable("Inventory", (string)null);
-                });
-
             modelBuilder.Entity("UnaProject.Domain.Entities.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -787,17 +764,6 @@ namespace UnaProject.Infra.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("UnaProject.Domain.Entities.Inventory", b =>
-                {
-                    b.HasOne("UnaProject.Domain.Entities.Product", "Product")
-                        .WithOne("Inventory")
-                        .HasForeignKey("UnaProject.Domain.Entities.Inventory", "ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-                });
-
             modelBuilder.Entity("UnaProject.Domain.Entities.Order", b =>
                 {
                     b.HasOne("UnaProject.Domain.Entities.Address", "Address")
@@ -901,9 +867,6 @@ namespace UnaProject.Infra.Migrations
             modelBuilder.Entity("UnaProject.Domain.Entities.Product", b =>
                 {
                     b.Navigation("Attributes");
-
-                    b.Navigation("Inventory")
-                        .IsRequired();
 
                     b.Navigation("OrderItems");
                 });
