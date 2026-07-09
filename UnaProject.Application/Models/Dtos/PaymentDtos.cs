@@ -1,20 +1,10 @@
 namespace UnaProject.Application.Models.Dtos
 {
-    public class WebhookEventDto
-    {
-        public string? Event { get; set; }
-        public WebhookDataDto? Data { get; set; }
-    }
-
-    public class WebhookDataDto
-    {
-        public string? BillingId { get; set; }
-        public string? Status { get; set; }
-        public decimal? PlatformFee { get; set; }
-        public DateTime? PaidAt { get; set; }
-        public string? Metadata { get; set; }
-    }
-
+    /// <summary>
+    /// Resposta de criação de pagamento retornada por POST /api/payment/create.
+    /// O nome mantém o histórico (fluxo antigo AbacatePay), mas hoje é usada pelo fluxo Stripe:
+    /// o campo relevante é <see cref="ClientSecret"/> (PaymentIntent do Stripe).
+    /// </summary>
     public class CreateAbacatePaymentResponse
     {
         public Guid PaymentId { get; set; }
@@ -29,7 +19,7 @@ namespace UnaProject.Application.Models.Dtos
 
         /// <summary>
         /// PaymentIntent.ClientSecret do Stripe, usado pelo frontend (Stripe Elements/Stripe.js)
-        /// para confirmar o pagamento no navegador. Nulo para gateways que não usam esse fluxo (ex.: AbacatePay).
+        /// para confirmar o pagamento no navegador.
         /// </summary>
         public string? ClientSecret { get; set; }
     }

@@ -11,7 +11,6 @@ using System.Text;
 using UnaProject.Application.Interfaces;
 using UnaProject.Application.Services;
 using UnaProject.Application.Services.Interfaces;
-using UnaProject.Application.Extensions;
 using UnaProject.Application.Services.Background;
 using UnaProject.Domain.Entities.Security;
 using UnaProject.Domain.Security;
@@ -190,9 +189,6 @@ builder.Services.AddScoped<ISocialTokenValidator, SocialTokenValidator>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddHttpClient();
 
-// AbacatePay Configuration — DESATIVADO na migração para Stripe (mantido no código por
-// reversibilidade; ver UnaProject.Application/Extensions/AbacatePayServiceExtensions.cs).
-// builder.Services.AddAbacatePay(builder.Configuration);
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IWebhookRetryService, WebhookRetryService>();
 builder.Services.AddScoped<IPaymentNotificationService, PaymentNotificationService>();

@@ -160,14 +160,17 @@ namespace UnaProject.Web.Controllers
         }
 
         [SwaggerOperation(
-                 Summary = "Forgout Password",
+                 Summary = "Forgot Password",
                  Description = "Send a password recovery email to the user.")]
         [SwaggerResponse(200, "Success", typeof(Result<ForgoutPasswordResponse>))]
+        // Rota nova: e-mail no corpo (não expõe o endereço na query string / logs).
+        // Rota legada "forgout-password" (typo) mantida por compatibilidade temporária.
+        [HttpPost("forgot-password")]
         [HttpPost("forgout-password")]
         [AllowAnonymous]
-        public async Task<IActionResult> ForgoutPassword(string email)
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
         {
-            var command = new ForgoutPasswordCommand(email);
+            var command = new ForgoutPasswordCommand(request.Email);
             var result = await _mediator.Send(command);
 
             if (result.HasSuccess)
